@@ -1,10 +1,10 @@
-package nl.inholland.bankAppBackEnd;
+package nl.inholland.sigmabankingapp;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class BankAppBackEndApplicationTests {
+class SigmabankingappApplicationTests {
 
 	@Test
 	void contextLoads() {

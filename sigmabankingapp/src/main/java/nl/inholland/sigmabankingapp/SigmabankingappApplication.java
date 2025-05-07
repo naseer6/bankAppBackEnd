@@ -1,13 +1,13 @@
-package nl.inholland.bankAppBackEnd;
+package nl.inholland.sigmabankingapp;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class BankAppBackEndApplication {
+public class SigmabankingappApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(BankAppBackEndApplication.class, args);
+		SpringApplication.run(SigmabankingappApplication.class, args);
 	}
 
 }
