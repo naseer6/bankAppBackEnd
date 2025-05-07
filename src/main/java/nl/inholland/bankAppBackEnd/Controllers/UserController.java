@@ -19,6 +19,11 @@ public class UserController {
         return userService.register(user);
     }
 
+    @GetMapping("/test")
+    public String test() {
+        return "✅ Security config is working";
+    }
+
     @GetMapping("/foo")
     public String foo() {
         return "foo";
