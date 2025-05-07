@@ -3,6 +3,7 @@ package nl.inholland.bankAppBackEnd.Controllers;
 import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -15,9 +16,17 @@ public class UserController {
     private UserService userService;
 
     @PostMapping("/register")
-    public User register(@RequestBody User user) {
-        return userService.register(user);
+    public ResponseEntity<?> register(@RequestBody User user) {
+        try {
+            User saved = userService.register(user);
+            return ResponseEntity.ok(saved);
+        } catch (Exception e) {
+            e.printStackTrace(); // 👈 This logs the real error in console
+            return ResponseEntity.status(500).body("❌ Error: " + e.getMessage());
+        }
     }
+
+
 
     @GetMapping("/test")
     public String test() {

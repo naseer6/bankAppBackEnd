@@ -42,3 +42,86 @@ insert into user (address,email,name,password,phone,role,username,id) values (?,
 2025-05-07 14:37:58.496979+02:00 jdbc[3]: exception
 org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
 insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:36:59.677518+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:37:13.572910+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "select u1_0.id,u1_0.address,u1_0.email,u1_0.name,u1_0.password,u1_0.phone,u1_0.role,u1_0.username from [*]user u1_0 where u1_0.id=?"; expected "identifier"; SQL statement:
+select u1_0.id,u1_0.address,u1_0.email,u1_0.name,u1_0.password,u1_0.phone,u1_0.role,u1_0.username from user u1_0 where u1_0.id=? [42001-232]
+2025-05-07 20:39:32.864995+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:40:12.512270+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:41:20.372929+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:41:21.671798+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:41:44.664303+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:41:46.064520+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:42:55.788564+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:43:17.193565+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:45:21.706916+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:45:31.951995+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:45:32.790438+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:46:06.455048+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:46:27.201900+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "insert into [*]user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default)"; expected "identifier"; SQL statement:
+insert into user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42001-232]
+2025-05-07 20:48:51.647164+02:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "APP_USER" not found (this database is empty); SQL statement:
+insert into app_user (address,email,name,password,phone,role,username,id) values (?,?,?,?,?,?,?,default) [42104-232]
+2025-05-07 20:55:41.765813+02:00 database: flush
+org.h2.message.DbException: General error: "org.h2.mvstore.MVStoreException: The file is locked: C:/Users/31638/Desktop/term4/bankAppBackEnd/data/bankdb.mv.db [2.3.232/7]" [50000-232]
+	at org.h2.message.DbException.get(DbException.java:212)
+	at org.h2.message.DbException.convert(DbException.java:407)
+	at org.h2.mvstore.db.Store.lambda$new$0(Store.java:122)
+	at org.h2.mvstore.MVStore.handleException(MVStore.java:1546)
+	at org.h2.mvstore.MVStore.panic(MVStore.java:371)
+	at org.h2.mvstore.MVStore.<init>(MVStore.java:291)
+	at org.h2.mvstore.MVStore$Builder.open(MVStore.java:2035)
+	at org.h2.mvstore.db.Store.<init>(Store.java:133)
+	at org.h2.engine.Database.<init>(Database.java:326)
+	at org.h2.engine.Engine.openSession(Engine.java:92)
+	at org.h2.engine.Engine.openSession(Engine.java:222)
+	at org.h2.engine.Engine.createSession(Engine.java:201)
+	at org.h2.engine.SessionRemote.connectEmbeddedOrServer(SessionRemote.java:344)
+	at org.h2.jdbc.JdbcConnection.<init>(JdbcConnection.java:124)
+	at org.h2.util.JdbcUtils.getConnection(JdbcUtils.java:291)
+	at org.h2.server.web.WebServer.getConnection(WebServer.java:811)
+	at org.h2.server.web.WebApp.login(WebApp.java:1038)
+	at org.h2.server.web.WebApp.process(WebApp.java:226)
+	at org.h2.server.web.WebApp.processRequest(WebApp.java:176)
+	at org.h2.server.web.WebThread.process(WebThread.java:154)
+	at org.h2.server.web.WebThread.run(WebThread.java:103)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: org.h2.jdbc.JdbcSQLNonTransientException: General error: "org.h2.mvstore.MVStoreException: The file is locked: C:/Users/31638/Desktop/term4/bankAppBackEnd/data/bankdb.mv.db [2.3.232/7]" [50000-232]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:566)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	... 22 more
+Caused by: org.h2.mvstore.MVStoreException: The file is locked: C:/Users/31638/Desktop/term4/bankAppBackEnd/data/bankdb.mv.db [2.3.232/7]
+	at org.h2.mvstore.DataUtils.newMVStoreException(DataUtils.java:996)
+	at org.h2.mvstore.SingleFileStore.lockFileChannel(SingleFileStore.java:143)
+	at org.h2.mvstore.SingleFileStore.open(SingleFileStore.java:117)
+	at org.h2.mvstore.SingleFileStore.open(SingleFileStore.java:81)
+	at org.h2.mvstore.MVStore.<init>(MVStore.java:286)
+	... 16 more

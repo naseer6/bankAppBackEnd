@@ -3,7 +3,6 @@ package nl.inholland.bankAppBackEnd.services;
 import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -14,10 +13,8 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
-    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-
     public User register(User user) {
-        user.setPassword(encoder.encode(user.getPassword()));
+        // ❗ Store the password as-is (not secure, but your choice)
         user.setRole(User.Role.USER); // Default role
         return userRepository.save(user);
     }
@@ -26,7 +23,8 @@ public class UserService {
         Optional<User> optionalUser = userRepository.findByUsername(username);
         if (optionalUser.isPresent()) {
             User user = optionalUser.get();
-            if (encoder.matches(rawPassword, user.getPassword())) {
+            // Plaintext comparison (again, not secure, but you asked for it)
+            if (user.getPassword().equals(rawPassword)) {
                 return Optional.of(user);
             }
         }
