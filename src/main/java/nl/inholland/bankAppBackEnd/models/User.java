@@ -1,4 +1,4 @@
-package models;
+package nl.inholland.bankAppBackEnd.models;
 
 import jakarta.persistence.*;
 

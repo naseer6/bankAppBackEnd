@@ -1,6 +1,6 @@
-package repository;
+package nl.inholland.bankAppBackEnd.repository;
 
-import models.User;
+import nl.inholland.bankAppBackEnd.models.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

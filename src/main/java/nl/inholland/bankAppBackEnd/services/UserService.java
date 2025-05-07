@@ -1,7 +1,7 @@
-package services;
+package nl.inholland.bankAppBackEnd.services;
 
-import models.User;
-import repository.UserRepository;
+import nl.inholland.bankAppBackEnd.models.User;
+import nl.inholland.bankAppBackEnd.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;

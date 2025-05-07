@@ -1,7 +1,7 @@
-package Controllers;
+package nl.inholland.bankAppBackEnd.Controllers;
 
-import models.User;
-import services.UserService;
+import nl.inholland.bankAppBackEnd.models.User;
+import nl.inholland.bankAppBackEnd.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +17,11 @@ public class UserController {
     @PostMapping("/register")
     public User register(@RequestBody User user) {
         return userService.register(user);
+    }
+
+    @GetMapping("/foo")
+    public String foo() {
+        return "foo";
     }
 
     @PostMapping("/login")
