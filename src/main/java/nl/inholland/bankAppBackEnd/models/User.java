@@ -34,8 +34,8 @@ public class User {
     public enum Role {
         ADMIN,
         USER,
-        MODERATOR
     }
+
 
     // Constructors
     public User() {}

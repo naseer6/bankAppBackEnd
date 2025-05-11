@@ -17,14 +17,23 @@ public class UserController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
+        if (userService.emailExists(user.getEmail())) {
+            return ResponseEntity.status(409).body("❌ Email is already in use");
+        }
+
+        if (userService.usernameExists(user.getUsername())) {
+            return ResponseEntity.status(409).body("❌ Username is already in use");
+        }
+
         try {
             User saved = userService.register(user);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
-            e.printStackTrace(); // 👈 This logs the real error in console
+            e.printStackTrace();
             return ResponseEntity.status(500).body("❌ Error: " + e.getMessage());
         }
     }
+
 
 
 
