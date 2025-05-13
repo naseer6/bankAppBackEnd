@@ -21,17 +21,26 @@ public class BankAccountController {
 
     @PostMapping("/create")
     public Object createAccount(@RequestParam Long userId) {
-        Optional<User> user = userRepository.findById(userId);
+        Optional<User> userOpt = userRepository.findById(userId);
 
-        if (user.isEmpty()) {
+        if (userOpt.isEmpty()) {
             return "❌ User not found.";
         }
 
-        if (!user.get().getRole().equals(User.Role.USER)) {
-            return "❌ Account can only be created for USER roles.";
+        User user = userOpt.get();
+
+        // Check if user is approved
+        if (!user.isApproved()) {
+            return "❌ Account creation is only allowed for approved users.";
         }
 
-        BankAccount account = bankAccountService.createAccountForUser(user.get());
+        if (!user.getRole().equals(User.Role.USER)) {
+            return "❌ Account can only be created for users with USER role.";
+        }
+
+        // If the user is approved, create the bank account
+        BankAccount account = bankAccountService.createAccountForUser(user);
         return account;
     }
 }
+

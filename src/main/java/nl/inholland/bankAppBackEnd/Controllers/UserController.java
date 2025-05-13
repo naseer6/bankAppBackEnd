@@ -3,10 +3,13 @@ package nl.inholland.bankAppBackEnd.Controllers;
 import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/users")
@@ -26,6 +29,7 @@ public class UserController {
         }
 
         try {
+            user.setApproved(false); // Default to unapproved
             User saved = userService.register(user);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
@@ -33,9 +37,6 @@ public class UserController {
             return ResponseEntity.status(500).body("❌ Error: " + e.getMessage());
         }
     }
-
-
-
 
     @GetMapping("/test")
     public String test() {
@@ -48,12 +49,42 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public String login(@RequestBody Map<String, String> loginData) {
+    public ResponseEntity<String> login(@RequestBody Map<String, String> loginData) {
         String username = loginData.get("username");
         String password = loginData.get("password");
 
-        return userService.login(username, password)
-                .map(user -> "Login successful! Welcome, " + user.getUsername())
-                .orElse("Invalid username or password");
+        Optional<User> optionalUser = userService.login(username, password);
+
+        if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+
+            // Instead of rejecting login, let them login but show they are unapproved
+            if (!user.isApproved()) {
+                return ResponseEntity.ok("Login successful! However, your account is awaiting approval by an admin.");
+            }
+
+            // If approved, continue with login flow (send JWT or session token here)
+            return ResponseEntity.ok("Login successful!");
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid username or password");
+        }
+    }
+
+
+    // Use Principal to get the current authenticated user
+    @GetMapping("/me")
+    public ResponseEntity<User> getCurrentUser(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build(); // User is not authenticated
+        }
+
+        String username = principal.getName(); // Get the username from the Principal object
+        Optional<User> userOpt = userService.getUserByUsername(username); // Find the user by username
+
+        if (userOpt.isPresent()) {
+            return ResponseEntity.ok(userOpt.get()); // Return user details if found
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // Return Not Found if user doesn't exist
+        }
     }
 }

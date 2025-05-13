@@ -15,7 +15,8 @@ public class UserService {
 
     public User register(User user) {
         // ❗ Store the password as-is (not secure, but your choice)
-        user.setRole(User.Role.USER); // Default role
+        user.setRole(User.Role.USER);
+        user.setApproved(false);// Default role
         return userRepository.save(user);
     }
 
@@ -38,5 +39,10 @@ public class UserService {
     public boolean usernameExists(String username) {
         return userRepository.findByUsername(username).isPresent();
     }
+
+    public Optional<User> getUserByUsername(String username) {
+        return userRepository.findByUsername(username); // Assuming findByUsername exists in UserRepository
+    }
+
 
 }

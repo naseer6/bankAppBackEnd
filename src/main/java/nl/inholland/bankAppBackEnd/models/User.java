@@ -30,6 +30,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
+    private boolean isApproved = false;
 
     public enum Role {
         ADMIN,
@@ -50,8 +51,15 @@ public class User {
         this.role = role;
     }
 
-    // Getters and Setters
 
+    // Getters and Setters
+    public boolean isApproved() {
+        return isApproved;
+    }
+
+    public void setApproved(boolean approved) {
+        this.isApproved = approved;
+    }
     public Long getId() { return id; }
 
     public void setId(Long id) { this.id = id; }
