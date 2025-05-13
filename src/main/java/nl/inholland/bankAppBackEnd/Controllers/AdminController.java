@@ -7,10 +7,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/admin")
+@RequestMapping("/api/admin")
 public class AdminController {
 
     @Autowired
@@ -36,4 +37,15 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found.");
         }
     }
+
+    @GetMapping("/unapproved-users")
+    public ResponseEntity<?> getUnapprovedUsers() {
+        List<User> unapprovedUsers = userRepository.findAll()
+                .stream()
+                .filter(user -> !user.isApproved() && user.getRole() == User.Role.USER)
+                .toList();
+
+        return ResponseEntity.ok(unapprovedUsers);
+    }
+
 }

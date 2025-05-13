@@ -54,25 +54,20 @@ public class UserController {
 
         User user = optionalUser.get();
 
-        if (!user.isApproved()) {
-            return ResponseEntity.ok(Map.of(
-                    "message", "Login successful, but your account is not yet approved",
-                    "approved", false,
-                    "username", user.getUsername(),
-                    "role", user.getRole()
-            ));
-        }
-
-
         String token = jwtUtil.generateToken(user.getUsername());
 
+        // Send token no matter if approved or not
         return ResponseEntity.ok(Map.of(
                 "token", token,
                 "username", user.getUsername(),
                 "role", user.getRole(),
-                "approved", user.isApproved()
+                "approved", user.isApproved(),
+                "message", user.isApproved()
+                        ? "Login successful"
+                        : "Login successful, but your account is not yet approved"
         ));
     }
+
 
     @GetMapping("/test")
     public String test() {
