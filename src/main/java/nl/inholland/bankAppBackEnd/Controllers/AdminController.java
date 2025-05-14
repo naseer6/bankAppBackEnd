@@ -2,6 +2,7 @@ package nl.inholland.bankAppBackEnd.Controllers;
 
 import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.repository.UserRepository;
+import nl.inholland.bankAppBackEnd.services.BankAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,10 @@ public class AdminController {
     @Autowired
     private UserRepository userRepository;
 
-    // Approve a user by admin
+    @Autowired
+    private BankAccountService bankAccountService;
+
+
     @PostMapping("/approve/{userId}")
     public ResponseEntity<String> approveUser(@PathVariable Long userId) {
         Optional<User> userOpt = userRepository.findById(userId);
@@ -25,18 +29,24 @@ public class AdminController {
         if (userOpt.isPresent()) {
             User user = userOpt.get();
 
-            // Check if user is a regular user and not already approved
             if (user.getRole() == User.Role.USER && !user.isApproved()) {
-                user.setApproved(true); // Mark user as approved
+                user.setApproved(true);
                 userRepository.save(user);
-                return ResponseEntity.ok("User approved successfully.");
+
+                // 🏦 Create bank account after approval
+                bankAccountService.createAccountsForUser(user);
+
+
+                return ResponseEntity.ok("User approved and bank account created.");
             } else {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("User is already approved or is not eligible for approval.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("User is already approved or not eligible.");
             }
         } else {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found.");
         }
     }
+
 
     @GetMapping("/unapproved-users")
     public ResponseEntity<?> getUnapprovedUsers() {

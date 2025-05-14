@@ -94,4 +94,30 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
         }
     }
+
+    @PostMapping("/login-email")
+    public ResponseEntity<?> loginByEmail(@RequestBody Map<String, String> creds) {
+        String email = creds.get("email");
+        String password = creds.get("password");
+
+        Optional<User> optionalUser = userService.getUserByEmail(email);
+
+        if (optionalUser.isEmpty() || !optionalUser.get().getPassword().equals(password)) {
+            return ResponseEntity.status(401).body("Invalid credentials");
+        }
+
+        User user = optionalUser.get();
+        String token = jwtUtil.generateToken(user.getUsername()); // Token still uses username for consistency
+
+        return ResponseEntity.ok(Map.of(
+                "token", token,
+                "username", user.getUsername(),
+                "role", user.getRole(),
+                "approved", user.isApproved(),
+                "message", user.isApproved()
+                        ? "Login successful"
+                        : "Login successful, but your account is not yet approved"
+        ));
+    }
+
 }

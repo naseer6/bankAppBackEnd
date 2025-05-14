@@ -36,7 +36,7 @@ public class SecurityConfig {
                 .headers().frameOptions().disable() // Allow H2 Console
                 .and()
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/h2-console/**", "/api/users/register", "/api/users/login").permitAll()
+                        .requestMatchers("/h2-console/**", "/api/users/register", "/api/users/login" ,"/api/users/login-email").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/accounts/create").hasRole("ADMIN")
                         .anyRequest().authenticated()

@@ -36,6 +36,10 @@ public class UserService implements UserDetailsService {
         return userRepository.findByUsername(username);
     }
 
+    public Optional<User> getUserByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
+
     // ✅ Spring Security will call this when someone logs in
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {

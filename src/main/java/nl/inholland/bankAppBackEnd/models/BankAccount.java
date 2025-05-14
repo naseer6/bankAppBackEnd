@@ -12,8 +12,16 @@ public class BankAccount {
 
     private Double balance;
 
+    @Enumerated(EnumType.STRING)
+    private AccountType type;
+
     @ManyToOne
     private User owner;
+
+    public enum AccountType {
+        CHECKING,
+        SAVINGS
+    }
 
     // Getters & Setters
 
@@ -28,4 +36,8 @@ public class BankAccount {
 
     public User getOwner() { return owner; }
     public void setOwner(User owner) { this.owner = owner; }
+
+    public AccountType getType() { return type; }
+    public void setType(AccountType type) { this.type = type; }
+
 }
