@@ -10,9 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -127,7 +125,40 @@ public class BankAccountController {
         return ResponseEntity.ok(balances); // e.g. { "checking": 100.0, "savings": 200.0 }
     }
 
+    @GetMapping("/find-by-name")
+    public ResponseEntity<?> findAccountsByOwnerName(@RequestParam String name) {
+        // First check if name parameter is valid
+        if (name == null || name.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("❌ Name parameter cannot be empty.");
+        }
 
+        List<User> matchingUsers = userRepository.findByNameContainingIgnoreCase(name);
+
+        if (matchingUsers.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ No users found with name: " + name);
+        }
+
+        // Get all accounts for these users
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (User user : matchingUsers) {
+            List<BankAccount> userAccounts = bankAccountRepository.findAllByOwner(user);
+
+            for (BankAccount account : userAccounts) {
+                Map<String, Object> accountDetails = new HashMap<>();
+                accountDetails.put("ownerName", user.getName());
+                accountDetails.put("iban", account.getIban());
+                accountDetails.put("accountType", account.getType().toString());
+
+                results.add(accountDetails);
+            }
+        }
+
+        if (results.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ No accounts found for users with name: " + name);
+        }
+
+        return ResponseEntity.ok(results);
+    }
 
 }
 

@@ -12,6 +12,6 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, Long> 
     Optional<BankAccount> findByOwnerAndType(User owner, BankAccount.AccountType type);
     List<BankAccount> findAllByOwner(User owner);
 
-
+    List<BankAccount> findByOwnerNameContainingIgnoreCase(String name);
 
 }
