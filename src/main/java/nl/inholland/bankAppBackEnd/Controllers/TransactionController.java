@@ -22,9 +22,17 @@ public class TransactionController {
         return ResponseEntity.ok(saved);
     }
 
+    // Remove duplicate getAllTransactions, use only filtered version
     @GetMapping
-    public ResponseEntity<List<Transaction>> getAllTransactions() {
-        return ResponseEntity.ok(transactionService.findAll());
+    public ResponseEntity<List<Transaction>> getFilteredTransactions(
+            @RequestParam(required = false) String iban,
+            @RequestParam(required = false) Double amount,
+            @RequestParam(required = false) String comparator,
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end
+    ) {
+        List<Transaction> results = transactionService.getFilteredTransactions(iban, amount, comparator, start, end);
+        return ResponseEntity.ok(results);
     }
 
     @GetMapping("/{id}")
