@@ -2,6 +2,7 @@ package nl.inholland.bankAppBackEnd.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -9,7 +10,6 @@ import java.time.format.DateTimeFormatter;
 
 @Entity
 public class Transaction {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
