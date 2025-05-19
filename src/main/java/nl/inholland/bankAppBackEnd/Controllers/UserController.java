@@ -102,14 +102,24 @@ public class UserController {
         String email = creds.get("email");
         String password = creds.get("password");
 
+        System.out.println("Login attempt with email: " + email);
+
         Optional<User> optionalUser = userService.getUserByEmail(email);
 
-        if (optionalUser.isEmpty() || !optionalUser.get().getPassword().equals(password)) {
+        if (optionalUser.isEmpty()) {
+            System.out.println("User not found");
             return ResponseEntity.status(401).body("Invalid credentials");
         }
 
         User user = optionalUser.get();
-        String token = jwtUtil.generateToken(user.getUsername()); // Token still uses username for consistency
+        System.out.println("Found user: " + user.getUsername());
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            System.out.println("Password mismatch");
+            return ResponseEntity.status(401).body("Invalid credentials");
+        }
+
+        String token = jwtUtil.generateToken(user.getUsername());
 
         return ResponseEntity.ok(Map.of(
                 "token", token,
@@ -121,5 +131,7 @@ public class UserController {
                         : "Login successful, but your account is not yet approved"
         ));
     }
+
+
 
 }
