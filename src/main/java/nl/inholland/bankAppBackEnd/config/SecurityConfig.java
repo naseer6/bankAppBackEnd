@@ -3,6 +3,7 @@ package nl.inholland.bankAppBackEnd.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 
@@ -20,35 +21,30 @@ public class SecurityConfig {
     @Autowired
     private CustomAuthenticationEntryPoint customEntryPoint;
 
-    @Autowired
-    private JwtAuthenticationFilter jwtFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return NoOpPasswordEncoder.getInstance(); // ⚠ Only for testing
+        return new BCryptPasswordEncoder(); // ✅ Secure
     }
 
+
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter) throws Exception {
         http
                 .cors().and()
                 .csrf().disable()
-                .headers().frameOptions().disable() // Allow H2 Console
+                .headers().frameOptions().disable()
                 .and()
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/h2-console/**", "/api/users/register", "/api/users/login" ,"/api/users/login-email").permitAll()
+                        .requestMatchers("/h2-console/**", "/api/users/register", "/api/users/login").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/accounts/create").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(customEntryPoint)
-                )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // 🔥 No sessions
-                );
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(customEntryPoint))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-        // ✅ Add JWT filter before Spring's default one
+        // ✅ Inject here instead of as a field
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

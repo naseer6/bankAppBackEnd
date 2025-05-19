@@ -6,6 +6,7 @@ import nl.inholland.bankAppBackEnd.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -20,6 +21,9 @@ public class UserController {
     private UserService userService;
     @Autowired
     private JwtUtil jwtUtil;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
@@ -48,15 +52,13 @@ public class UserController {
 
         Optional<User> optionalUser = userService.getUserByUsername(username);
 
-        if (optionalUser.isEmpty() || !optionalUser.get().getPassword().equals(password)) {
+        if (optionalUser.isEmpty() || !passwordEncoder.matches(password, optionalUser.get().getPassword())) {
             return ResponseEntity.status(401).body("Invalid credentials");
         }
 
         User user = optionalUser.get();
-
         String token = jwtUtil.generateToken(user.getUsername());
 
-        // Send token no matter if approved or not
         return ResponseEntity.ok(Map.of(
                 "token", token,
                 "username", user.getUsername(),
