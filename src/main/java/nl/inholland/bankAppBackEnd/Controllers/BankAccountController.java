@@ -125,6 +125,33 @@ public class BankAccountController {
         return ResponseEntity.ok(balances); // e.g. { "checking": 100.0, "savings": 200.0 }
     }
 
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<?> getAccountsByUserId(@PathVariable Long userId) {
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ User not found.");
+        }
+
+        List<BankAccount> accounts = bankAccountRepository.findAllByOwner(userOpt.get());
+
+        if (accounts.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList()); // or return a message if preferred
+        }
+
+        // Optional: Map to DTO to avoid infinite recursion or exposing sensitive info
+        List<Map<String, Object>> result = accounts.stream().map(acc -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", acc.getId());
+            map.put("iban", acc.getIban());
+            map.put("balance", acc.getBalance());
+            map.put("type", acc.getType());
+            return map;
+        }).toList();
+
+        return ResponseEntity.ok(result);
+    }
+
+
     @GetMapping("/find-by-name")
     public ResponseEntity<?> findAccountsByOwnerName(@RequestParam String name) {
         // First check if name parameter is valid
