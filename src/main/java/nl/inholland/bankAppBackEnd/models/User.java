@@ -32,12 +32,21 @@ public class User {
     private Role role;
     private boolean isApproved = false;
 
+    @Column(name = "bsn_number", nullable = false, unique = true)
+    private String bsnNumber;
+
     public enum Role {
         ADMIN,
         USER,
     }
 
+    public String getBsnNumber() {
+        return bsnNumber;
+    }
 
+    public void setBsnNumber(String bsnNumber) {
+        this.bsnNumber = bsnNumber;
+    }
     // Constructors
     public User() {}
 

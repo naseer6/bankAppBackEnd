@@ -1,5 +1,5 @@
 package nl.inholland.bankAppBackEnd.Controllers;
-
+import nl.inholland.bankAppBackEnd.repository.UserRepository;
 import nl.inholland.bankAppBackEnd.config.JwtUtil;
 import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.services.UserService;
@@ -23,6 +23,8 @@ public class UserController {
     private JwtUtil jwtUtil;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private UserRepository userRepository;
 
 
     @PostMapping("/register")
@@ -34,7 +36,9 @@ public class UserController {
         if (userService.usernameExists(user.getUsername())) {
             return ResponseEntity.status(409).body("❌ Username is already in use");
         }
-
+        if (userRepository.findByBsnNumber(user.getBsnNumber()).isPresent()) {
+            return ResponseEntity.status(409).body("❌ BSN number is already in use");
+        }
         try {
             user.setApproved(false); // All users start unapproved
             User saved = userService.register(user);
@@ -43,21 +47,23 @@ public class UserController {
             e.printStackTrace();
             return ResponseEntity.status(500).body("❌ Error: " + e.getMessage());
         }
+
+
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> creds) {
-        String username = creds.get("username");
+        String email = creds.get("email");
         String password = creds.get("password");
 
-        Optional<User> optionalUser = userService.getUserByUsername(username);
+        Optional<User> optionalUser = userService.getUserByEmail(email); // ✅ changed from getUserByUsername
 
         if (optionalUser.isEmpty() || !passwordEncoder.matches(password, optionalUser.get().getPassword())) {
             return ResponseEntity.status(401).body("Invalid credentials");
         }
 
         User user = optionalUser.get();
-        String token = jwtUtil.generateToken(user.getUsername());
+        String token = jwtUtil.generateToken(user.getUsername()); // still generating based on username
 
         return ResponseEntity.ok(Map.of(
                 "token", token,
@@ -69,6 +75,7 @@ public class UserController {
                         : "Login successful, but your account is not yet approved"
         ));
     }
+
 
 
     @GetMapping("/test")
