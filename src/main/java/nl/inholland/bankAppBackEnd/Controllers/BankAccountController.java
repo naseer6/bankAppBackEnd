@@ -5,9 +5,11 @@ import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.repository.BankAccountRepository;
 import nl.inholland.bankAppBackEnd.repository.UserRepository;
 import nl.inholland.bankAppBackEnd.services.BankAccountService;
+import nl.inholland.bankAppBackEnd.services.TransferLimitService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -22,8 +24,12 @@ public class BankAccountController {
 
     @Autowired
     private UserRepository userRepository;
+
     @Autowired
     private BankAccountRepository bankAccountRepository;
+
+    @Autowired
+    private TransferLimitService transferLimitService;
 
     @PostMapping("/create")
     public Object createAccount(@RequestParam Long userId) {
@@ -49,7 +55,6 @@ public class BankAccountController {
         return account;
     }
 
-
     @PostMapping("/deposit")
     public ResponseEntity<?> deposit(@RequestParam Long userId,
                                      @RequestParam double amount,
@@ -70,11 +75,25 @@ public class BankAccountController {
         }
 
         BankAccount account = accOpt.get();
+
+        // For deposits, we only check daily limits (not absolute limits since it's adding money)
+        TransferLimitService.TransferValidationResult validation =
+                transferLimitService.validateTransfer(account, amount, false);
+
+        if (!validation.isValid()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(validation.getErrorMessage());
+        }
+
+        // Process deposit
         account.setBalance(account.getBalance() + amount);
         bankAccountService.save(account);
-        return ResponseEntity.ok("✅ Deposit successful to " + type + ". New balance: " + account.getBalance());
-    }
 
+        // Record the transfer for daily tracking
+        transferLimitService.recordTransfer(account, amount);
+
+        return ResponseEntity.ok("✅ Deposit successful to " + type + ". New balance: €" +
+                String.format("%.2f", account.getBalance()));
+    }
 
     @PostMapping("/withdraw")
     public ResponseEntity<?> withdraw(@RequestParam Long userId,
@@ -97,16 +116,84 @@ public class BankAccountController {
 
         BankAccount account = accOpt.get();
 
+        // Basic balance check
         if (account.getBalance() < amount) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("❌ Insufficient funds.");
         }
 
+        // Check both absolute and daily limits
+        TransferLimitService.TransferValidationResult validation =
+                transferLimitService.validateTransfer(account, amount, true);
+
+        if (!validation.isValid()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(validation.getErrorMessage());
+        }
+
+        // Process withdrawal
         account.setBalance(account.getBalance() - amount);
         bankAccountService.save(account);
-        return ResponseEntity.ok("✅ Withdrawal successful from " + type + ". New balance: " + account.getBalance());
+
+        // Record the transfer for daily tracking
+        transferLimitService.recordTransfer(account, amount);
+
+        return ResponseEntity.ok("✅ Withdrawal successful from " + type + ". New balance: €" +
+                String.format("%.2f", account.getBalance()) +
+                ". Available balance: €" + String.format("%.2f", account.getAvailableBalance()));
     }
 
+    @PostMapping("/{accountId}/limits")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateLimits(@PathVariable Long accountId,
+                                          @RequestParam Double absoluteLimit,
+                                          @RequestParam Double dailyLimit) {
+        Optional<BankAccount> accountOpt = bankAccountRepository.findById(accountId);
+        if (accountOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ Account not found.");
+        }
 
+        BankAccount account = accountOpt.get();
+
+        // Validate limits
+        if (absoluteLimit < 0) {
+            return ResponseEntity.badRequest().body("❌ Absolute limit cannot be negative.");
+        }
+
+        if (dailyLimit <= 0) {
+            return ResponseEntity.badRequest().body("❌ Daily limit must be greater than zero.");
+        }
+
+        if (absoluteLimit > account.getBalance()) {
+            return ResponseEntity.badRequest().body("❌ Absolute limit cannot be higher than current balance.");
+        }
+
+        account.setAbsoluteLimit(absoluteLimit);
+        account.setDailyLimit(dailyLimit);
+        bankAccountService.save(account);
+
+        return ResponseEntity.ok("✅ Limits updated successfully. Absolute limit: €" +
+                String.format("%.2f", absoluteLimit) + ", Daily limit: €" +
+                String.format("%.2f", dailyLimit));
+    }
+
+    @GetMapping("/{accountId}/limits")
+    public ResponseEntity<?> getLimits(@PathVariable Long accountId) {
+        Optional<BankAccount> accountOpt = bankAccountRepository.findById(accountId);
+        if (accountOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ Account not found.");
+        }
+
+        BankAccount account = accountOpt.get();
+        Double remainingDaily = transferLimitService.getRemainingDailyLimit(account);
+
+        Map<String, Object> limits = new HashMap<>();
+        limits.put("absoluteLimit", account.getAbsoluteLimit());
+        limits.put("dailyLimit", account.getDailyLimit());
+        limits.put("remainingDailyLimit", remainingDaily);
+        limits.put("availableBalance", account.getAvailableBalance());
+        limits.put("currentBalance", account.getBalance());
+
+        return ResponseEntity.ok(limits);
+    }
 
     @GetMapping("/balance")
     public ResponseEntity<?> getBalances(@RequestParam Long userId) {
@@ -116,13 +203,21 @@ public class BankAccountController {
         }
 
         List<BankAccount> accounts = bankAccountRepository.findAllByOwner(userOpt.get());
-        Map<String, Double> balances = accounts.stream()
+        Map<String, Object> balances = accounts.stream()
                 .collect(Collectors.toMap(
                         acc -> acc.getType().name().toLowerCase(),
-                        BankAccount::getBalance
+                        acc -> {
+                            Map<String, Object> accountInfo = new HashMap<>();
+                            accountInfo.put("balance", acc.getBalance());
+                            accountInfo.put("availableBalance", acc.getAvailableBalance());
+                            accountInfo.put("absoluteLimit", acc.getAbsoluteLimit());
+                            accountInfo.put("dailyLimit", acc.getDailyLimit());
+                            accountInfo.put("remainingDailyLimit", transferLimitService.getRemainingDailyLimit(acc));
+                            return accountInfo;
+                        }
                 ));
 
-        return ResponseEntity.ok(balances); // e.g. { "checking": 100.0, "savings": 200.0 }
+        return ResponseEntity.ok(balances);
     }
 
     @GetMapping("/user/{userId}")
@@ -135,26 +230,27 @@ public class BankAccountController {
         List<BankAccount> accounts = bankAccountRepository.findAllByOwner(userOpt.get());
 
         if (accounts.isEmpty()) {
-            return ResponseEntity.ok(Collections.emptyList()); // or return a message if preferred
+            return ResponseEntity.ok(Collections.emptyList());
         }
 
-        // Optional: Map to DTO to avoid infinite recursion or exposing sensitive info
         List<Map<String, Object>> result = accounts.stream().map(acc -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", acc.getId());
             map.put("iban", acc.getIban());
             map.put("balance", acc.getBalance());
             map.put("type", acc.getType());
+            map.put("absoluteLimit", acc.getAbsoluteLimit());
+            map.put("dailyLimit", acc.getDailyLimit());
+            map.put("availableBalance", acc.getAvailableBalance());
+            map.put("remainingDailyLimit", transferLimitService.getRemainingDailyLimit(acc));
             return map;
         }).toList();
 
         return ResponseEntity.ok(result);
     }
 
-
     @GetMapping("/find-by-name")
     public ResponseEntity<?> findAccountsByOwnerName(@RequestParam String name) {
-        // First check if name parameter is valid
         if (name == null || name.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("❌ Name parameter cannot be empty.");
         }
@@ -165,7 +261,6 @@ public class BankAccountController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ No users found with name: " + name);
         }
 
-        // Get all accounts for these users
         List<Map<String, Object>> results = new ArrayList<>();
         for (User user : matchingUsers) {
             List<BankAccount> userAccounts = bankAccountRepository.findAllByOwner(user);
@@ -175,6 +270,8 @@ public class BankAccountController {
                 accountDetails.put("ownerName", user.getName());
                 accountDetails.put("iban", account.getIban());
                 accountDetails.put("accountType", account.getType().toString());
+                accountDetails.put("absoluteLimit", account.getAbsoluteLimit());
+                accountDetails.put("dailyLimit", account.getDailyLimit());
 
                 results.add(accountDetails);
             }
@@ -186,6 +283,4 @@ public class BankAccountController {
 
         return ResponseEntity.ok(results);
     }
-
 }
-
