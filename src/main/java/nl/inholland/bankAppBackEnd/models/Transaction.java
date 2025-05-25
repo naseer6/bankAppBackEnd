@@ -2,7 +2,6 @@ package nl.inholland.bankAppBackEnd.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -29,6 +28,11 @@ public class Transaction {
     @JsonIgnore // Prevent sending full BankAccount object for 'toAccount'
     private BankAccount toAccount;
 
+    @ManyToOne
+    @JoinColumn(name = "initiated_by_user_id", nullable = false)
+    @JsonIgnore // Prevent sending full User object
+    private User initiatedByUser;
+
     private LocalDateTime timestamp;
 
     // Custom getters to expose IBAN strings instead of full accounts
@@ -38,6 +42,12 @@ public class Transaction {
 
     public String getToIban() {
         return toAccount != null ? toAccount.getIban() : null;
+    }
+
+    // Expose username of who initiated the transaction
+    @JsonProperty("initiatedBy")
+    public String getInitiatedByUsername() {
+        return initiatedByUser != null ? initiatedByUser.getUsername() : null;
     }
 
     // Format timestamp as ISO date string for frontend to parse easily
@@ -92,6 +102,14 @@ public class Transaction {
 
     public void setToAccount(BankAccount toAccount) {
         this.toAccount = toAccount;
+    }
+
+    public User getInitiatedByUser() {
+        return initiatedByUser;
+    }
+
+    public void setInitiatedByUser(User initiatedByUser) {
+        this.initiatedByUser = initiatedByUser;
     }
 
     public LocalDateTime getTimestamp() {
