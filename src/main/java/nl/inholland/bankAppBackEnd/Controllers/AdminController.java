@@ -105,7 +105,7 @@ public class AdminController {
         }
     }
 
-    // Additional endpoint for dashboard statistics
+
     @GetMapping("/dashboard-stats")
     public ResponseEntity<?> getDashboardStats() {
         int pendingApprovals = userRepository.findAll()
