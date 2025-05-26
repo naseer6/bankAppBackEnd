@@ -91,4 +91,14 @@ public class BankAccount {
         resetDailySpentIfNewDay();
         return Math.max(0, this.dailyLimit - this.dailySpent);
     }
+    private Boolean active = true;
+
+    public boolean isActive() {
+        return active == null ? true : active;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
+    }
+
 }

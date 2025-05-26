@@ -1,11 +1,15 @@
 package nl.inholland.bankAppBackEnd.services;
+
+import jakarta.transaction.Transactional;
 import nl.inholland.bankAppBackEnd.models.BankAccount;
 import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.repository.BankAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 
 @Service
@@ -21,6 +25,7 @@ public class BankAccountService {
         account.setIban(generateIban());
         account.setAbsoluteLimit(0.0); // Default absolute limit
         account.setDailyLimit(1000.0); // Default daily limit
+
         return bankAccountRepository.save(account);
     }
 
@@ -37,6 +42,7 @@ public class BankAccountService {
         checking.setAbsoluteLimit(absoluteLimit);
         checking.setDailyLimit(dailyLimit);
 
+
         BankAccount savings = new BankAccount();
         savings.setIban(generateIban());
         savings.setBalance(0.0);
@@ -44,6 +50,7 @@ public class BankAccountService {
         savings.setType(BankAccount.AccountType.SAVINGS);
         savings.setAbsoluteLimit(absoluteLimit);
         savings.setDailyLimit(0.0); // Savings accounts typically don't allow transfers
+
 
         bankAccountRepository.save(checking);
         bankAccountRepository.save(savings);
@@ -68,5 +75,37 @@ public class BankAccountService {
 
     public void save(BankAccount account) {
         bankAccountRepository.save(account);
+    }
+
+    public List<BankAccount> getAllAccounts() {
+        return bankAccountRepository.findAll();
+    }
+
+    public Optional<BankAccount> getAccountById(Long accountId) {
+        return bankAccountRepository.findById(accountId);
+    }
+
+    @Transactional
+    public boolean closeAccount(Long accountId) {
+        Optional<BankAccount> accountOpt = bankAccountRepository.findById(accountId);
+
+        if (accountOpt.isPresent()) {
+            BankAccount account = accountOpt.get();
+
+            // Check if the account has zero balance
+            if (account.getBalance() == 0.0) {
+                account.setActive(false);
+                bankAccountRepository.save(account);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public int getActiveAccountsCount() {
+        return (int) bankAccountRepository.findAll()
+                .stream()
+                .filter(BankAccount::isActive)
+                .count();
     }
 }

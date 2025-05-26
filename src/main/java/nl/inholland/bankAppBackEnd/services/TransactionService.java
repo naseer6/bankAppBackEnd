@@ -16,7 +16,6 @@ import java.time.format.DateTimeFormatter;
 @Service
 public class TransactionService {
 
-
     @Autowired
     private TransactionRepository transactionRepository;
 
@@ -38,8 +37,8 @@ public class TransactionService {
 
         if (iban != null && !iban.isEmpty()) {
             stream = stream.filter(tx ->
-                (tx.getFromAccount() != null && iban.equalsIgnoreCase(tx.getFromAccount().getIban())) ||
-                (tx.getToAccount() != null && iban.equalsIgnoreCase(tx.getToAccount().getIban()))
+                    (tx.getFromAccount() != null && iban.equalsIgnoreCase(tx.getFromAccount().getIban())) ||
+                            (tx.getToAccount() != null && iban.equalsIgnoreCase(tx.getToAccount().getIban()))
             );
         }
 
@@ -51,7 +50,6 @@ public class TransactionService {
                 case "=" -> stream = stream.filter(tx -> BigDecimal.valueOf(tx.getAmount()).compareTo(amt) == 0);
             }
         }
-
 
         DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE;
         if (start != null && !start.isEmpty()) {
@@ -65,5 +63,17 @@ public class TransactionService {
         }
 
         return stream.toList();
+    }
+
+    public List<Transaction> getTransactionsByAccountId(Long accountId) {
+        return transactionRepository.findByFromAccountIdOrToAccountIdOrderByTimestampDesc(accountId, accountId);
+    }
+
+    public int getTodayTransactionsCount() {
+        LocalDate today = LocalDate.now();
+        return (int) transactionRepository.findAll()
+                .stream()
+                .filter(tx -> tx.getTimestamp().toLocalDate().equals(today))
+                .count();
     }
 }
