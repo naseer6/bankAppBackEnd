@@ -1,17 +1,19 @@
 package nl.inholland.bankAppBackEnd.services;
 
+import nl.inholland.bankAppBackEnd.DTOs.TransactionDTO;
+import nl.inholland.bankAppBackEnd.models.BankAccount;
 import nl.inholland.bankAppBackEnd.models.Transaction;
+import nl.inholland.bankAppBackEnd.models.User;
+import nl.inholland.bankAppBackEnd.repository.BankAccountRepository;
 import nl.inholland.bankAppBackEnd.repository.TransactionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Stream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionService {
@@ -19,6 +21,10 @@ public class TransactionService {
     @Autowired
     private TransactionRepository transactionRepository;
 
+    @Autowired
+    private BankAccountRepository bankAccountRepository;
+
+    // Basic CRUD operations
     public Transaction save(Transaction transaction) {
         return transactionRepository.save(transaction);
     }
@@ -31,49 +37,223 @@ public class TransactionService {
         return transactionRepository.findById(id);
     }
 
-    public List<Transaction> getFilteredTransactions(String iban, Double amount, String comparator, String start, String end) {
-        List<Transaction> all = transactionRepository.findAll();
-        Stream<Transaction> stream = all.stream();
+    // Convert Transaction to TransactionDTO
+    private TransactionDTO convertToDTO(Transaction transaction, List<String> userIbans) {
+        TransactionDTO dto = new TransactionDTO();
+        
+        dto.setId(transaction.getId());
+        dto.setAmount(transaction.getAmount());
+        dto.setDescription(transaction.getTransactionType());
+        
+        // Set IBANs
+        dto.setFromIban(transaction.getFromAccount() != null ? transaction.getFromAccount().getIban() : null);
+        dto.setToIban(transaction.getToAccount() != null ? transaction.getToAccount().getIban() : null);
+        
+        // Set date
+        dto.setDate(transaction.getTimestamp() != null ? 
+                transaction.getTimestamp().format(DateTimeFormatter.ISO_LOCAL_DATE) : null);
+        
+        // Set initiated by
+        dto.setInitiatedBy(transaction.getInitiatedByUser() != null ? 
+                transaction.getInitiatedByUser().getUsername() : null);
+        
+        // Add direction information
+        String direction = determineDirection(transaction, userIbans);
+        dto.setDirection(direction);
+        
+        // Add signed amount
+        Double signedAmount = determineSignedAmount(direction, transaction.getAmount());
+        dto.setSignedAmount(signedAmount);
+        
+        return dto;
+    }
 
-        if (iban != null && !iban.isEmpty()) {
-            stream = stream.filter(tx ->
-                    (tx.getFromAccount() != null && iban.equalsIgnoreCase(tx.getFromAccount().getIban())) ||
-                            (tx.getToAccount() != null && iban.equalsIgnoreCase(tx.getToAccount().getIban()))
-            );
+    // Transaction with direction info - for better display in UI
+    public List<TransactionDTO> getFilteredTransactionsWithDirection(User user, String iban, String ibanType,
+                                                                     Double amount, String comparator,
+                                                                     String start, String end) {
+        List<String> userIbans = getUserIbans(user);
+        List<Transaction> transactions = getFilteredTransactionsByUser(user, iban, ibanType, amount, comparator, start, end);
+        return transactions.stream()
+                .map(tx -> convertToDTO(tx, userIbans))
+                .collect(Collectors.toList());
+    }
+
+    public TransactionDTO getTransactionWithDirectionById(Long id, User user) {
+        Optional<Transaction> txOpt = findById(id);
+        if (txOpt.isEmpty()) {
+            return null;
         }
 
-        if (amount != null && comparator != null) {
-            BigDecimal amt = BigDecimal.valueOf(amount);
-            switch (comparator) {
-                case ">" -> stream = stream.filter(tx -> BigDecimal.valueOf(tx.getAmount()).compareTo(amt) > 0);
-                case "<" -> stream = stream.filter(tx -> BigDecimal.valueOf(tx.getAmount()).compareTo(amt) < 0);
-                case "=" -> stream = stream.filter(tx -> BigDecimal.valueOf(tx.getAmount()).compareTo(amt) == 0);
+        List<String> userIbans = getUserIbans(user);
+        return convertToDTO(txOpt.get(), userIbans);
+    }
+
+    public List<TransactionDTO> getTransactionsWithDirectionByUser(User user) {
+        List<String> userIbans = getUserIbans(user);
+        List<Transaction> transactions = getTransactionsByUser(user);
+        return transactions.stream()
+                .map(tx -> convertToDTO(tx, userIbans))
+                .collect(Collectors.toList());
+    }
+
+    // Helper method to get user's IBANs
+    public List<String> getUserIbans(User user) {
+        List<String> userIbans = new ArrayList<>();
+        List<BankAccount> userAccounts = bankAccountRepository.findAllByOwner(user);
+
+        for (BankAccount account : userAccounts) {
+            userIbans.add(account.getIban());
+        }
+
+        return userIbans;
+    }
+
+    private String determineDirection(Transaction tx, List<String> userIbans) {
+        boolean isFromUserAccount = tx.getFromAccount() != null && 
+                userIbans.contains(tx.getFromAccount().getIban());
+        boolean isToUserAccount = tx.getToAccount() != null && 
+                userIbans.contains(tx.getToAccount().getIban());
+
+        if (isFromUserAccount && isToUserAccount) return "Internal";
+        if (isFromUserAccount) return "Outgoing";
+        if (isToUserAccount) return "Incoming";
+        return "External";
+    }
+
+    private Double determineSignedAmount(String direction, Double amount) {
+        switch (direction) {
+            case "Outgoing":
+                return -Math.abs(amount);
+            case "Incoming":
+                return Math.abs(amount);
+            case "Internal":
+                return 0.0;
+            default:
+                return amount;
+        }
+    }
+
+    // Transaction filtering methods
+    public List<Transaction> getFilteredTransactionsByUser(User user, String iban, String ibanType,
+                                                           Double amount, String comparator,
+                                                           String start, String end) {
+        List<Transaction> userTransactions = transactionRepository.findByAccountOwner(user);
+        List<Transaction> filteredTransactions = new ArrayList<>();
+
+        for (Transaction tx : userTransactions) {
+            if (matchesFilters(tx, iban, ibanType, amount, comparator, start, end)) {
+                filteredTransactions.add(tx);
             }
         }
 
-        DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE;
-        if (start != null && !start.isEmpty()) {
-            LocalDate startDate = LocalDate.parse(start, formatter);
-            stream = stream.filter(tx -> tx.getTimestamp().toLocalDate().compareTo(startDate) >= 0);
+        return filteredTransactions;
+    }
+
+    public List<Transaction> getFilteredTransactions(String iban, String ibanType, Double amount,
+                                                     String comparator, String start, String end) {
+        List<Transaction> allTransactions = transactionRepository.findAll();
+        List<Transaction> filteredTransactions = new ArrayList<>();
+
+        for (Transaction tx : allTransactions) {
+            if (matchesFilters(tx, iban, ibanType, amount, comparator, start, end)) {
+                filteredTransactions.add(tx);
+            }
         }
 
-        if (end != null && !end.isEmpty()) {
-            LocalDate endDate = LocalDate.parse(end, formatter);
-            stream = stream.filter(tx -> tx.getTimestamp().toLocalDate().compareTo(endDate) <= 0);
+        return filteredTransactions;
+    }
+
+    private boolean matchesFilters(Transaction tx, String iban, String ibanType,
+                                   Double amount, String comparator,
+                                   String start, String end) {
+        return matchesIbanFilter(tx, iban, ibanType) &&
+                matchesAmountFilter(tx, amount, comparator) &&
+                matchesDateFilter(tx, start, end);
+    }
+
+    private boolean matchesIbanFilter(Transaction tx, String iban, String ibanType) {
+        if (iban == null || iban.isEmpty()) return true;
+
+        String type = (ibanType == null || ibanType.isEmpty()) ? "both" : ibanType.toLowerCase();
+
+        if ("from".equals(type)) {
+            return matchesFromIban(tx, iban);
+        } else if ("to".equals(type)) {
+            return matchesToIban(tx, iban);
+        } else {
+            return matchesFromIban(tx, iban) || matchesToIban(tx, iban);
+        }
+    }
+
+    private boolean matchesFromIban(Transaction tx, String iban) {
+        return tx.getFromAccount() != null &&
+                iban.equalsIgnoreCase(tx.getFromAccount().getIban());
+    }
+
+    private boolean matchesToIban(Transaction tx, String iban) {
+        return tx.getToAccount() != null &&
+                iban.equalsIgnoreCase(tx.getToAccount().getIban());
+    }
+
+    private boolean matchesAmountFilter(Transaction tx, Double amount, String comparator) {
+        if (amount == null || comparator == null) return true;
+
+        BigDecimal txAmount = BigDecimal.valueOf(tx.getAmount());
+        BigDecimal filterAmount = BigDecimal.valueOf(amount);
+
+        if (">".equals(comparator)) {
+            return txAmount.compareTo(filterAmount) > 0;
+        } else if ("<".equals(comparator)) {
+            return txAmount.compareTo(filterAmount) < 0;
+        } else if ("=".equals(comparator)) {
+            return txAmount.compareTo(filterAmount) == 0;
         }
 
-        return stream.toList();
+        return true; // Default if comparator is invalid
+    }
+
+    private boolean matchesDateFilter(Transaction tx, String start, String end) {
+        return isAfterStartDate(tx, start) && isBeforeEndDate(tx, end);
+    }
+
+    private boolean isAfterStartDate(Transaction tx, String start) {
+        if (start == null || start.isEmpty()) return true;
+
+        LocalDate startDate = LocalDate.parse(start, DateTimeFormatter.ISO_DATE);
+        LocalDate txDate = tx.getTimestamp().toLocalDate();
+
+        return !txDate.isBefore(startDate); // txDate >= startDate
+    }
+
+    private boolean isBeforeEndDate(Transaction tx, String end) {
+        if (end == null || end.isEmpty()) return true;
+
+        LocalDate endDate = LocalDate.parse(end, DateTimeFormatter.ISO_DATE);
+        LocalDate txDate = tx.getTimestamp().toLocalDate();
+
+        return !txDate.isAfter(endDate); // txDate <= endDate
     }
 
     public List<Transaction> getTransactionsByAccountId(Long accountId) {
         return transactionRepository.findByFromAccountIdOrToAccountIdOrderByTimestampDesc(accountId, accountId);
     }
 
+    public List<Transaction> getTransactionsByUser(User user) {
+        return transactionRepository.findByAccountOwner(user);
+    }
+
     public int getTodayTransactionsCount() {
         LocalDate today = LocalDate.now();
-        return (int) transactionRepository.findAll()
-                .stream()
-                .filter(tx -> tx.getTimestamp().toLocalDate().equals(today))
-                .count();
+        List<Transaction> allTransactions = transactionRepository.findAll();
+        int count = 0;
+
+        for (Transaction tx : allTransactions) {
+            if (tx.getTimestamp().toLocalDate().equals(today)) {
+                count++;
+            }
+        }
+
+        return count;
     }
 }

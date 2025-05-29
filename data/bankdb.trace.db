@@ -4707,3 +4707,40 @@ select ba1_0.id,ba1_0.absolute_limit,ba1_0.active,ba1_0.balance,ba1_0.daily_limi
 	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:659)
 	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63)
 	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-05-29 14:21:55.748228+02:00 jdbc[13]: exception
+org.h2.jdbc.JdbcSQLDataException: Data conversion error converting "'NL21INHO0156966940' (TRANSACTION: ""TO_ACCOUNT_ID"" BIGINT)"; SQL statement:
+-- DEPOSIT to main account
+INSERT INTO TRANSACTION (ID, AMOUNT, TIMESTAMP, TRANSACTION_TYPE, FROM_ACCOUNT_ID, INITIATED_BY_USER_ID, TO_ACCOUNT_ID)
+VALUES 
+(44, 1200.0, '2025-05-29 10:15:42.102345', 'DEPOSIT', NULL, 90, 'NL21INHO0156966940'),
+
+-- TRANSFER from main to mysterious
+(45, 250.0, '2025-05-29 11:03:26.987654', 'TRANSFER', 'NL21INHO0156966940', 90, 'NL08INHO0823811666'),
+
+-- PAYMENT from main to random
+(46, 89.99, '2025-05-29 12:24:51.314159', 'PAYMENT', 'NL21INHO0156966940', 90, 70),
+
+-- TRANSFER from mysterious to main (plot twist!)
+(47, 500.0, '2025-05-29 13:00:00.000000', 'TRANSFER', 'NL08INHO0823811666', 91, 'NL21INHO0156966940'),
+
+-- WITHDRAWAL from main
+(48, 300.0, '2025-05-29 13:30:10.123456', 'WITHDRAWAL', 'NL21INHO0156966940', 90, NULL),
+
+-- TRANSFER from main to another random account
+(49, 145.75, '2025-05-29 14:00:00.555555', 'TRANSFER', 'NL21INHO0156966940', 90, 77),
+
+-- TRANSFER from main to mysterious again (why not)
+(50, 60.0, '2025-05-29 14:45:00.222222', 'TRANSFER', 'NL21INHO0156966940 [22018-232]
+2025-05-29 14:23:30.010179+02:00 jdbc[13]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "SELECT * FROM APP_USER BANK_ACCOUNT [*]TRANSACTION"; SQL statement:
+SELECT * FROM APP_USER BANK_ACCOUNT TRANSACTION [42000-232]
+2025-05-29 14:24:10.360912+02:00 jdbc[13]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "SELECT * FROM APP_USER\000d\000a[*]SELECT * FROM TRANSACTION \000d\000aSELECT * FROM BANK_ACCOUNT"; SQL statement:
+SELECT * FROM APP_USER
+SELECT * FROM TRANSACTION 
+SELECT * FROM BANK_ACCOUNT [42000-232]
+2025-05-29 14:24:11.797633+02:00 jdbc[13]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "SELECT * FROM APP_USER\000d\000a[*]SELECT * FROM TRANSACTION \000d\000aSELECT * FROM BANK_ACCOUNT"; SQL statement:
+SELECT * FROM APP_USER
+SELECT * FROM TRANSACTION 
+SELECT * FROM BANK_ACCOUNT [42000-232]
