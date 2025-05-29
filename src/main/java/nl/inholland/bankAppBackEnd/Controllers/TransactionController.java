@@ -1,12 +1,18 @@
 package nl.inholland.bankAppBackEnd.Controllers;
 
 import nl.inholland.bankAppBackEnd.models.Transaction;
+import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.services.TransactionService;
+import nl.inholland.bankAppBackEnd.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -16,6 +22,17 @@ public class TransactionController {
     @Autowired
     private TransactionService transactionService;
 
+    @Autowired
+    private UserService userService;
+
+    private User getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null) {
+            return null;
+        }
+        return userService.getUserByUsername(auth.getName()).orElse(null);
+    }
+
     @PostMapping
     public ResponseEntity<Transaction> createTransaction(@RequestBody Transaction transaction) {
         Transaction saved = transactionService.save(transaction);
@@ -23,30 +40,60 @@ public class TransactionController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Transaction>> getFilteredTransactions(
+    public ResponseEntity<?> getFilteredTransactions(
             @RequestParam(required = false) String iban,
-            @RequestParam(required = false) String ibanType, // New parameter for IBAN filtering
+            @RequestParam(required = false) String ibanType,
             @RequestParam(required = false) Double amount,
             @RequestParam(required = false) String comparator,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end
     ) {
-        List<Transaction> results;
-
-        // Use the appropriate method based on whether ibanType is provided
-        if (ibanType != null && !ibanType.isEmpty()) {
-            results = transactionService.getFilteredTransactions(iban, ibanType, amount, comparator, start, end);
-        } else {
-            results = transactionService.getFilteredTransactions(iban, ibanType, amount, comparator, start, end);
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Not authenticated");
         }
 
-        return ResponseEntity.ok(results);
+        // Let service handle all the logic
+        List<Map<String, Object>> enhancedTransactions = transactionService.getFilteredTransactionsWithDirection(
+                currentUser, iban, ibanType, amount, comparator, start, end);
+
+        return ResponseEntity.ok(enhancedTransactions);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getTransactionById(@PathVariable Long id) {
-        Optional<Transaction> transaction = transactionService.findById(id);
-        return transaction.map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Not authenticated");
+        }
+
+        Map<String, Object> enhancedTransaction = transactionService.getTransactionWithDirectionById(id, currentUser);
+        if (enhancedTransaction == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(enhancedTransaction);
+    }
+
+    @GetMapping("/my-transactions")
+    public ResponseEntity<?> getMyTransactions() {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Not authenticated");
+        }
+
+        List<Map<String, Object>> enhancedTransactions = transactionService.getTransactionsWithDirectionByUser(currentUser);
+        return ResponseEntity.ok(enhancedTransactions);
+    }
+
+    @GetMapping("/user-ibans")
+    public ResponseEntity<?> getUserIbans() {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Not authenticated");
+        }
+
+        List<String> userIbans = transactionService.getUserIbans(currentUser);
+        return ResponseEntity.ok(Map.of("ibans", userIbans));
     }
 }
