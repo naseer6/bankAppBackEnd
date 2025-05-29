@@ -1,5 +1,6 @@
 package nl.inholland.bankAppBackEnd.services;
 
+import nl.inholland.bankAppBackEnd.DTOs.TransactionDTO;
 import nl.inholland.bankAppBackEnd.models.BankAccount;
 import nl.inholland.bankAppBackEnd.models.Transaction;
 import nl.inholland.bankAppBackEnd.models.User;
@@ -12,6 +13,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionService {
@@ -35,29 +37,64 @@ public class TransactionService {
         return transactionRepository.findById(id);
     }
 
-    // Transaction with direction info - for better display in UI
-    public List<Map<String, Object>> getFilteredTransactionsWithDirection(User user, String iban, String ibanType,
-                                                                          Double amount, String comparator,
-                                                                          String start, String end) {
-        List<String> userIbans = getUserIbans(user);
-        List<Transaction> transactions = getFilteredTransactionsByUser(user, iban, ibanType, amount, comparator, start, end);
-        return enrichTransactionsWithDirection(transactions, userIbans);
+    // Convert Transaction to TransactionDTO
+    private TransactionDTO convertToDTO(Transaction transaction, List<String> userIbans) {
+        TransactionDTO dto = new TransactionDTO();
+        
+        dto.setId(transaction.getId());
+        dto.setAmount(transaction.getAmount());
+        dto.setDescription(transaction.getTransactionType());
+        
+        // Set IBANs
+        dto.setFromIban(transaction.getFromAccount() != null ? transaction.getFromAccount().getIban() : null);
+        dto.setToIban(transaction.getToAccount() != null ? transaction.getToAccount().getIban() : null);
+        
+        // Set date
+        dto.setDate(transaction.getTimestamp() != null ? 
+                transaction.getTimestamp().format(DateTimeFormatter.ISO_LOCAL_DATE) : null);
+        
+        // Set initiated by
+        dto.setInitiatedBy(transaction.getInitiatedByUser() != null ? 
+                transaction.getInitiatedByUser().getUsername() : null);
+        
+        // Add direction information
+        String direction = determineDirection(transaction, userIbans);
+        dto.setDirection(direction);
+        
+        // Add signed amount
+        Double signedAmount = determineSignedAmount(direction, transaction.getAmount());
+        dto.setSignedAmount(signedAmount);
+        
+        return dto;
     }
 
-    public Map<String, Object> getTransactionWithDirectionById(Long id, User user) {
+    // Transaction with direction info - for better display in UI
+    public List<TransactionDTO> getFilteredTransactionsWithDirection(User user, String iban, String ibanType,
+                                                                     Double amount, String comparator,
+                                                                     String start, String end) {
+        List<String> userIbans = getUserIbans(user);
+        List<Transaction> transactions = getFilteredTransactionsByUser(user, iban, ibanType, amount, comparator, start, end);
+        return transactions.stream()
+                .map(tx -> convertToDTO(tx, userIbans))
+                .collect(Collectors.toList());
+    }
+
+    public TransactionDTO getTransactionWithDirectionById(Long id, User user) {
         Optional<Transaction> txOpt = findById(id);
         if (txOpt.isEmpty()) {
             return null;
         }
 
         List<String> userIbans = getUserIbans(user);
-        return enrichTransactionWithDirection(txOpt.get(), userIbans);
+        return convertToDTO(txOpt.get(), userIbans);
     }
 
-    public List<Map<String, Object>> getTransactionsWithDirectionByUser(User user) {
+    public List<TransactionDTO> getTransactionsWithDirectionByUser(User user) {
         List<String> userIbans = getUserIbans(user);
         List<Transaction> transactions = getTransactionsByUser(user);
-        return enrichTransactionsWithDirection(transactions, userIbans);
+        return transactions.stream()
+                .map(tx -> convertToDTO(tx, userIbans))
+                .collect(Collectors.toList());
     }
 
     // Helper method to get user's IBANs
@@ -72,42 +109,11 @@ public class TransactionService {
         return userIbans;
     }
 
-    // Helper methods to enrich transactions with direction info
-    private List<Map<String, Object>> enrichTransactionsWithDirection(List<Transaction> transactions, List<String> userIbans) {
-        List<Map<String, Object>> result = new ArrayList<>();
-
-        for (Transaction tx : transactions) {
-            result.add(enrichTransactionWithDirection(tx, userIbans));
-        }
-
-        return result;
-    }
-
-    private Map<String, Object> enrichTransactionWithDirection(Transaction tx, List<String> userIbans) {
-        Map<String, Object> result = new HashMap<>();
-
-        // Basic transaction data
-        result.put("id", tx.getId());
-        result.put("fromIban", tx.getFromIban());
-        result.put("toIban", tx.getToIban());
-        result.put("amount", tx.getAmount());
-        result.put("date", tx.getFormattedTimestamp());
-        result.put("description", tx.getDescription());
-
-        // Add direction information
-        String direction = determineDirection(tx, userIbans);
-        result.put("direction", direction);
-
-        // Add signed amount (positive for incoming, negative for outgoing, zero for internal)
-        Double signedAmount = determineSignedAmount(direction, tx.getAmount());
-        result.put("signedAmount", signedAmount);
-
-        return result;
-    }
-
     private String determineDirection(Transaction tx, List<String> userIbans) {
-        boolean isFromUserAccount = userIbans.contains(tx.getFromIban());
-        boolean isToUserAccount = userIbans.contains(tx.getToIban());
+        boolean isFromUserAccount = tx.getFromAccount() != null && 
+                userIbans.contains(tx.getFromAccount().getIban());
+        boolean isToUserAccount = tx.getToAccount() != null && 
+                userIbans.contains(tx.getToAccount().getIban());
 
         if (isFromUserAccount && isToUserAccount) return "Internal";
         if (isFromUserAccount) return "Outgoing";

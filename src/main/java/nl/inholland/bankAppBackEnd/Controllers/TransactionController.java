@@ -1,5 +1,6 @@
 package nl.inholland.bankAppBackEnd.Controllers;
 
+import nl.inholland.bankAppBackEnd.DTOs.TransactionDTO;
 import nl.inholland.bankAppBackEnd.models.Transaction;
 import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.services.TransactionService;
@@ -53,11 +54,11 @@ public class TransactionController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Not authenticated");
         }
 
-        // Let service handle all the logic
-        List<Map<String, Object>> enhancedTransactions = transactionService.getFilteredTransactionsWithDirection(
+        // Let service handle all the logic and return DTOs
+        List<TransactionDTO> transactions = transactionService.getFilteredTransactionsWithDirection(
                 currentUser, iban, ibanType, amount, comparator, start, end);
 
-        return ResponseEntity.ok(enhancedTransactions);
+        return ResponseEntity.ok(transactions);
     }
 
     @GetMapping("/{id}")
@@ -67,12 +68,12 @@ public class TransactionController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Not authenticated");
         }
 
-        Map<String, Object> enhancedTransaction = transactionService.getTransactionWithDirectionById(id, currentUser);
-        if (enhancedTransaction == null) {
+        TransactionDTO transaction = transactionService.getTransactionWithDirectionById(id, currentUser);
+        if (transaction == null) {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(enhancedTransaction);
+        return ResponseEntity.ok(transaction);
     }
 
     @GetMapping("/my-transactions")
@@ -82,8 +83,8 @@ public class TransactionController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Not authenticated");
         }
 
-        List<Map<String, Object>> enhancedTransactions = transactionService.getTransactionsWithDirectionByUser(currentUser);
-        return ResponseEntity.ok(enhancedTransactions);
+        List<TransactionDTO> transactions = transactionService.getTransactionsWithDirectionByUser(currentUser);
+        return ResponseEntity.ok(transactions);
     }
 
     @GetMapping("/user-ibans")
