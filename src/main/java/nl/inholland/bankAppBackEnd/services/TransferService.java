@@ -294,12 +294,6 @@ public class TransferService {
         fromAccount.setBalance(fromAccount.getBalance() - amount);
         toAccount.setBalance(toAccount.getBalance() + amount);
 
-        // For internal transfers, we don't count against daily limits since it's between own accounts
-        // But we still update daily spent if it's from a checking account to maintain consistency
-        if (fromAccount.getType() == BankAccount.AccountType.CHECKING) {
-            fromAccount.addToDailySpent(amount);
-        }
-
         // Save accounts
         bankAccountRepository.save(fromAccount);
         bankAccountRepository.save(toAccount);
