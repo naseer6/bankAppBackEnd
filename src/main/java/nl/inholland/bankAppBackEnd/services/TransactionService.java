@@ -128,7 +128,10 @@ public class TransactionService {
             case "Incoming":
                 return Math.abs(amount);
             case "Internal":
-                return 0.0;
+                // Don't set internal transfers to 0.0
+                // For internal transfers, we still want to show the actual amount
+                // Use positive value since it's moving between your own accounts
+                return Math.abs(amount);
             default:
                 return amount;
         }
@@ -257,3 +260,4 @@ public class TransactionService {
         return count;
     }
 }
+
