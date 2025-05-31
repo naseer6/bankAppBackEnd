@@ -63,7 +63,7 @@ public class UserController {
         }
 
         User user = optionalUser.get();
-        String token = jwtUtil.generateToken(user.getUsername()); // still generating based on username
+        String token = jwtUtil.generateToken(user.getUsername(), user.getRole().toString()); // still generating based on username
 
         return ResponseEntity.ok(Map.of(
                 "token", token,
@@ -127,7 +127,7 @@ public class UserController {
             return ResponseEntity.status(401).body("Invalid credentials");
         }
 
-        String token = jwtUtil.generateToken(user.getUsername());
+        String token = jwtUtil.generateToken(user.getUsername(), user.getRole().toString());
         System.out.println("🎟️ Generated JWT: " + token);
 
         return ResponseEntity.ok(Map.of(
