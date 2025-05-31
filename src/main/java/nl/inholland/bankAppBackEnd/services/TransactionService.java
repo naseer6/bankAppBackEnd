@@ -7,10 +7,14 @@ import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.repository.BankAccountRepository;
 import nl.inholland.bankAppBackEnd.repository.TransactionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -31,6 +35,10 @@ public class TransactionService {
 
     public List<Transaction> findAll() {
         return transactionRepository.findAll();
+    }
+
+    public Page<Transaction> findAll(Pageable pageable) {
+        return transactionRepository.findAll(pageable);
     }
 
     public Optional<Transaction> findById(Long id) {
@@ -75,36 +83,69 @@ public class TransactionService {
         dto.setId(transaction.getId());
         dto.setAmount(transaction.getAmount());
         dto.setDescription(transaction.getTransactionType());
-        
-        // Set IBANs
         dto.setFromIban(transaction.getFromAccount() != null ? transaction.getFromAccount().getIban() : null);
         dto.setToIban(transaction.getToAccount() != null ? transaction.getToAccount().getIban() : null);
-        
-        // Set timestamp with both date and time
         dto.setDate(transaction.getTimestamp() != null ? 
                 transaction.getTimestamp().format(DateTimeFormatter.ISO_DATE_TIME) : null);
-        
-        // Set initiated by
         dto.setInitiatedBy(transaction.getInitiatedByUser() != null ? 
                 transaction.getInitiatedByUser().getUsername() : null);
         
         // For admin view, we don't calculate direction or signed amount
-        // as admins need to see the raw data
         dto.setDirection("Admin View");
         dto.setSignedAmount(transaction.getAmount());
         
         return dto;
     }
 
-    // Transaction with direction info - for better display in UI
-    public List<TransactionDTO> getFilteredTransactionsWithDirection(User user, String iban, String ibanType,
-                                                                     Double amount, String comparator,
-                                                                     String start, String end) {
+    /**
+     * Get filtered transactions with direction information for a user with pagination
+     */
+    public Page<TransactionDTO> getFilteredTransactionsWithDirection(
+            User user, String iban, String ibanType, Double amount, String comparator,
+            String start, String end, Pageable pageable) {
+        
         List<String> userIbans = getUserIbans(user);
-        List<Transaction> transactions = getFilteredTransactionsByUser(user, iban, ibanType, amount, comparator, start, end);
-        return transactions.stream()
+        
+        // Parse filter parameters
+        Double minAmount = null, maxAmount = null, exactAmount = null;
+        if (amount != null && comparator != null) {
+            switch (comparator) {
+                case ">": minAmount = amount; break;
+                case "<": maxAmount = amount; break;
+                case "=": exactAmount = amount; break;
+            }
+        }
+        
+        // Parse dates
+        LocalDateTime startDate = null, endDate = null;
+        if (start != null && !start.isEmpty()) {
+            startDate = LocalDate.parse(start, DateTimeFormatter.ISO_DATE).atStartOfDay();
+        }
+        if (end != null && !end.isEmpty()) {
+            endDate = LocalDate.parse(end, DateTimeFormatter.ISO_DATE).atTime(LocalTime.MAX);
+        }
+        
+        // Get filtered transactions from repository
+        Page<Transaction> transactionsPage = transactionRepository.findFilteredByUser(
+                user, iban, ibanType, minAmount, maxAmount, exactAmount, startDate, endDate, pageable);
+        
+        // Convert to DTOs with direction info
+        List<TransactionDTO> dtoList = transactionsPage.getContent().stream()
                 .map(tx -> convertToDTO(tx, userIbans))
                 .collect(Collectors.toList());
+        
+        return new PageImpl<>(dtoList, pageable, transactionsPage.getTotalElements());
+    }
+
+    // Non-paginated version for backward compatibility
+    public List<TransactionDTO> getFilteredTransactionsWithDirection(
+            User user, String iban, String ibanType, Double amount, String comparator, String start, String end) {
+        
+        // Use paginated version but get all results
+        Page<TransactionDTO> page = getFilteredTransactionsWithDirection(
+                user, iban, ibanType, amount, comparator, start, end, Pageable.unpaged());
+        
+        return page.getContent();
     }
 
     public TransactionDTO getTransactionWithDirectionById(Long id, User user) {
@@ -117,9 +158,22 @@ public class TransactionService {
         return convertToDTO(txOpt.get(), userIbans);
     }
 
+    // Get user transactions with direction info (paginated)
+    public Page<TransactionDTO> getTransactionsWithDirectionByUser(User user, Pageable pageable) {
+        List<String> userIbans = getUserIbans(user);
+        Page<Transaction> transactionsPage = transactionRepository.findByAccountOwner(user, pageable);
+        
+        List<TransactionDTO> transactionDTOs = transactionsPage.getContent().stream()
+                .map(tx -> convertToDTO(tx, userIbans))
+                .collect(Collectors.toList());
+                
+        return new PageImpl<>(transactionDTOs, pageable, transactionsPage.getTotalElements());
+    }
+
+    // Non-paginated version for backward compatibility
     public List<TransactionDTO> getTransactionsWithDirectionByUser(User user) {
         List<String> userIbans = getUserIbans(user);
-        List<Transaction> transactions = getTransactionsByUser(user);
+        List<Transaction> transactions = transactionRepository.findByAccountOwner(user);
         return transactions.stream()
                 .map(tx -> convertToDTO(tx, userIbans))
                 .collect(Collectors.toList());
@@ -127,14 +181,10 @@ public class TransactionService {
 
     // Helper method to get user's IBANs
     public List<String> getUserIbans(User user) {
-        List<String> userIbans = new ArrayList<>();
         List<BankAccount> userAccounts = bankAccountRepository.findAllByOwner(user);
-
-        for (BankAccount account : userAccounts) {
-            userIbans.add(account.getIban());
-        }
-
-        return userIbans;
+        return userAccounts.stream()
+            .map(BankAccount::getIban)
+            .collect(Collectors.toList());
     }
 
     private String determineDirection(Transaction tx, List<String> userIbans) {
@@ -151,166 +201,82 @@ public class TransactionService {
 
     private Double determineSignedAmount(String direction, Double amount) {
         switch (direction) {
-            case "Outgoing":
-                return -Math.abs(amount);
-            case "Incoming":
-                return Math.abs(amount);
-            case "Internal":
-                // Don't set internal transfers to 0.0
-                // For internal transfers, we still want to show the actual amount
-                // Use positive value since it's moving between your own accounts
-                return Math.abs(amount);
-            default:
-                return amount;
+            case "Outgoing": return -Math.abs(amount);
+            case "Incoming": return Math.abs(amount);
+            case "Internal": return Math.abs(amount); // Use positive value for internal transfers
+            default: return amount;
         }
     }
 
-    // Transaction filtering methods
-    public List<Transaction> getFilteredTransactionsByUser(User user, String iban, String ibanType,
-                                                           Double amount, String comparator,
-                                                           String start, String end) {
-        List<Transaction> userTransactions = transactionRepository.findByAccountOwner(user);
-        List<Transaction> filteredTransactions = new ArrayList<>();
-
-        for (Transaction tx : userTransactions) {
-            if (matchesFilters(tx, iban, ibanType, amount, comparator, start, end, null)) {
-                filteredTransactions.add(tx);
+    // Admin filtered transactions with pagination
+    public Page<Transaction> getFilteredTransactions(
+            String iban, String ibanType, Double amount, String comparator,
+            String start, String end, String initiatedBy, Pageable pageable) {
+        
+        // Parse filter parameters
+        Double minAmount = null, maxAmount = null, exactAmount = null;
+        if (amount != null && comparator != null) {
+            switch (comparator) {
+                case ">": minAmount = amount; break;
+                case "<": maxAmount = amount; break;
+                case "=": exactAmount = amount; break;
             }
         }
+        
+        // Parse dates
+        LocalDateTime startDate = null, endDate = null;
+        if (start != null && !start.isEmpty()) {
+            startDate = LocalDate.parse(start, DateTimeFormatter.ISO_DATE).atStartOfDay();
+        }
+        if (end != null && !end.isEmpty()) {
+            endDate = LocalDate.parse(end, DateTimeFormatter.ISO_DATE).atTime(LocalTime.MAX);
+        }
+        
+        return transactionRepository.findFiltered(
+                iban, ibanType, minAmount, maxAmount, exactAmount, startDate, endDate, initiatedBy, pageable);
+    }
 
-        return filteredTransactions;
+    // Legacy methods maintained for backward compatibility
+    public List<Transaction> getFilteredTransactionsByUser(User user, String iban, String ibanType,
+                                                          Double amount, String comparator,
+                                                          String start, String end) {
+        // Use paginated version but get all results
+        return getFilteredTransactions(iban, ibanType, amount, comparator, start, end, null, Pageable.unpaged())
+                .getContent();
     }
 
     public List<Transaction> getFilteredTransactions(String iban, String ibanType, Double amount,
-                                                     String comparator, String start, String end) {
-        return getFilteredTransactions(iban, ibanType, amount, comparator, start, end, null);
+                                                    String comparator, String start, String end) {
+        return getFilteredTransactions(iban, ibanType, amount, comparator, start, end, null, Pageable.unpaged())
+                .getContent();
     }
     
     public List<Transaction> getFilteredTransactions(String iban, String ibanType, Double amount,
-                                                     String comparator, String start, String end,
-                                                     String initiatedBy) {
-        List<Transaction> allTransactions = transactionRepository.findAll();
-        List<Transaction> filteredTransactions = new ArrayList<>();
-
-        for (Transaction tx : allTransactions) {
-            if (matchesFilters(tx, iban, ibanType, amount, comparator, start, end, initiatedBy)) {
-                filteredTransactions.add(tx);
-            }
-        }
-        
-        // Sort by timestamp in descending order to show most recent transactions first
-        filteredTransactions.sort(Comparator.comparing(Transaction::getTimestamp).reversed());
-        
-        return filteredTransactions;
+                                                    String comparator, String start, String end,
+                                                    String initiatedBy) {
+        return getFilteredTransactions(iban, ibanType, amount, comparator, start, end, initiatedBy, Pageable.unpaged())
+                .getContent();
     }
 
-    private boolean matchesFilters(Transaction tx, String iban, String ibanType,
-                                   Double amount, String comparator,
-                                   String start, String end) {
-        return matchesFilters(tx, iban, ibanType, amount, comparator, start, end, null);
+    // Get transactions for a specific user with pagination
+    public Page<Transaction> getTransactionsByUser(User user, Pageable pageable) {
+        return transactionRepository.findByAccountOwner(user, pageable);
     }
 
-    private boolean matchesFilters(Transaction tx, String iban, String ibanType,
-                                   Double amount, String comparator,
-                                   String start, String end, String initiatedBy) {
-        return matchesIbanFilter(tx, iban, ibanType) &&
-                matchesAmountFilter(tx, amount, comparator) &&
-                matchesDateFilter(tx, start, end) &&
-                matchesInitiatedByFilter(tx, initiatedBy);
-    }
-
-    private boolean matchesIbanFilter(Transaction tx, String iban, String ibanType) {
-        if (iban == null || iban.isEmpty()) return true;
-
-        String type = (ibanType == null || ibanType.isEmpty()) ? "both" : ibanType.toLowerCase();
-
-        if ("from".equals(type)) {
-            return matchesFromIban(tx, iban);
-        } else if ("to".equals(type)) {
-            return matchesToIban(tx, iban);
-        } else {
-            return matchesFromIban(tx, iban) || matchesToIban(tx, iban);
-        }
-    }
-
-    private boolean matchesFromIban(Transaction tx, String iban) {
-        return tx.getFromAccount() != null &&
-                iban.equalsIgnoreCase(tx.getFromAccount().getIban());
-    }
-
-    private boolean matchesToIban(Transaction tx, String iban) {
-        return tx.getToAccount() != null &&
-                iban.equalsIgnoreCase(tx.getToAccount().getIban());
-    }
-
-    private boolean matchesAmountFilter(Transaction tx, Double amount, String comparator) {
-        if (amount == null || comparator == null) return true;
-
-        BigDecimal txAmount = BigDecimal.valueOf(tx.getAmount());
-        BigDecimal filterAmount = BigDecimal.valueOf(amount);
-
-        if (">".equals(comparator)) {
-            return txAmount.compareTo(filterAmount) > 0;
-        } else if ("<".equals(comparator)) {
-            return txAmount.compareTo(filterAmount) < 0;
-        } else if ("=".equals(comparator)) {
-            return txAmount.compareTo(filterAmount) == 0;
-        }
-
-        return true; // Default if comparator is invalid
-    }
-
-    private boolean matchesDateFilter(Transaction tx, String start, String end) {
-        return isAfterStartDate(tx, start) && isBeforeEndDate(tx, end);
-    }
-
-    private boolean isAfterStartDate(Transaction tx, String start) {
-        if (start == null || start.isEmpty()) return true;
-
-        LocalDate startDate = LocalDate.parse(start, DateTimeFormatter.ISO_DATE);
-        LocalDate txDate = tx.getTimestamp().toLocalDate();
-
-        return !txDate.isBefore(startDate); // txDate >= startDate
-    }
-
-    private boolean isBeforeEndDate(Transaction tx, String end) {
-        if (end == null || end.isEmpty()) return true;
-
-        LocalDate endDate = LocalDate.parse(end, DateTimeFormatter.ISO_DATE);
-        LocalDate txDate = tx.getTimestamp().toLocalDate();
-
-        return !txDate.isAfter(endDate); // txDate <= endDate
-    }
-
-    private boolean matchesInitiatedByFilter(Transaction tx, String initiatedBy) {
-        if (initiatedBy == null || initiatedBy.isEmpty()) {
-            return true;
-        }
-        
-        return tx.getInitiatedByUser() != null &&
-                tx.getInitiatedByUser().getUsername().equalsIgnoreCase(initiatedBy);
-    }
-
-    public List<Transaction> getTransactionsByAccountId(Long accountId) {
-        return transactionRepository.findByFromAccountIdOrToAccountIdOrderByTimestampDesc(accountId, accountId);
-    }
-
+    // Get transactions for a user
     public List<Transaction> getTransactionsByUser(User user) {
         return transactionRepository.findByAccountOwner(user);
     }
 
+    // Get transactions for a specific bank account
+    public List<Transaction> getTransactionsByAccountId(Long accountId) {
+        return transactionRepository.findByFromAccountIdOrToAccountIdOrderByTimestampDesc(accountId, accountId);
+    }
+
+    // Count transactions for today
     public int getTodayTransactionsCount() {
-        LocalDate today = LocalDate.now();
-        List<Transaction> allTransactions = transactionRepository.findAll();
-        int count = 0;
-
-        for (Transaction tx : allTransactions) {
-            if (tx.getTimestamp().toLocalDate().equals(today)) {
-                count++;
-            }
-        }
-
-        return count;
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
+        return (int) transactionRepository.countTransactionsByDate(startOfDay, endOfDay);
     }
 }
-
