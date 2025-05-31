@@ -67,6 +67,34 @@ public class TransactionService {
         
         return dto;
     }
+    
+    // Convert Transaction to TransactionDTO for admin view (all transactions)
+    public TransactionDTO convertToAdminDTO(Transaction transaction) {
+        TransactionDTO dto = new TransactionDTO();
+        
+        dto.setId(transaction.getId());
+        dto.setAmount(transaction.getAmount());
+        dto.setDescription(transaction.getTransactionType());
+        
+        // Set IBANs
+        dto.setFromIban(transaction.getFromAccount() != null ? transaction.getFromAccount().getIban() : null);
+        dto.setToIban(transaction.getToAccount() != null ? transaction.getToAccount().getIban() : null);
+        
+        // Set date
+        dto.setDate(transaction.getTimestamp() != null ? 
+                transaction.getTimestamp().format(DateTimeFormatter.ISO_LOCAL_DATE) : null);
+        
+        // Set initiated by
+        dto.setInitiatedBy(transaction.getInitiatedByUser() != null ? 
+                transaction.getInitiatedByUser().getUsername() : null);
+        
+        // For admin view, we don't calculate direction or signed amount
+        // as admins need to see the raw data
+        dto.setDirection("Admin View");
+        dto.setSignedAmount(transaction.getAmount());
+        
+        return dto;
+    }
 
     // Transaction with direction info - for better display in UI
     public List<TransactionDTO> getFilteredTransactionsWithDirection(User user, String iban, String ibanType,

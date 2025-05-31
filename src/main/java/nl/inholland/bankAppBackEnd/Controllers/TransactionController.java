@@ -8,6 +8,7 @@ import nl.inholland.bankAppBackEnd.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -96,5 +97,32 @@ public class TransactionController {
 
         List<String> userIbans = transactionService.getUserIbans(currentUser);
         return ResponseEntity.ok(Map.of("ibans", userIbans));
+    }
+
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getAllTransactions(
+            @RequestParam(required = false) String iban,
+            @RequestParam(required = false) String ibanType,
+            @RequestParam(required = false) Double amount,
+            @RequestParam(required = false) String comparator,
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end
+    ) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Not authenticated");
+        }
+
+        // Get all transactions with optional filtering
+        List<Transaction> transactions = transactionService.getFilteredTransactions(
+                iban, ibanType, amount, comparator, start, end);
+        
+        // Convert all transactions to DTOs
+        List<TransactionDTO> transactionDTOs = transactions.stream()
+                .map(tx -> transactionService.convertToAdminDTO(tx))
+                .toList();
+
+        return ResponseEntity.ok(transactionDTOs);
     }
 }
