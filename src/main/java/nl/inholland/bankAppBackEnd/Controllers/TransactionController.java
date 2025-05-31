@@ -48,7 +48,8 @@ public class TransactionController {
             @RequestParam(required = false) Double amount,
             @RequestParam(required = false) String comparator,
             @RequestParam(required = false) String start,
-            @RequestParam(required = false) String end
+            @RequestParam(required = false) String end,
+            @RequestParam(required = false) String initiatedBy
     ) {
         User currentUser = getCurrentUser();
         if (currentUser == null) {
@@ -107,7 +108,8 @@ public class TransactionController {
             @RequestParam(required = false) Double amount,
             @RequestParam(required = false) String comparator,
             @RequestParam(required = false) String start,
-            @RequestParam(required = false) String end
+            @RequestParam(required = false) String end,
+            @RequestParam(required = false) String initiatedBy
     ) {
         User currentUser = getCurrentUser();
         if (currentUser == null) {
@@ -116,7 +118,7 @@ public class TransactionController {
 
         // Get all transactions with optional filtering
         List<Transaction> transactions = transactionService.getFilteredTransactions(
-                iban, ibanType, amount, comparator, start, end);
+                iban, ibanType, amount, comparator, start, end, initiatedBy);
         
         // Convert all transactions to DTOs
         List<TransactionDTO> transactionDTOs = transactions.stream()

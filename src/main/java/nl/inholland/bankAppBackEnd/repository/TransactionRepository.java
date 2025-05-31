@@ -16,4 +16,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     // Find transactions where the account belongs to the specified user
     @Query("SELECT t FROM Transaction t WHERE t.toAccount.owner = :user OR t.fromAccount.owner = :user ORDER BY t.timestamp DESC")
     List<Transaction> findByAccountOwner(@Param("user") User user);
+    
+    // Override default findAll to return transactions in descending timestamp order
+    @Query("SELECT t FROM Transaction t ORDER BY t.timestamp DESC")
+    List<Transaction> findAll();
 }

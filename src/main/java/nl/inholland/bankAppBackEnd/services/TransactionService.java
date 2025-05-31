@@ -49,9 +49,9 @@ public class TransactionService {
         dto.setFromIban(transaction.getFromAccount() != null ? transaction.getFromAccount().getIban() : null);
         dto.setToIban(transaction.getToAccount() != null ? transaction.getToAccount().getIban() : null);
         
-        // Set date
+        // Set timestamp with both date and time
         dto.setDate(transaction.getTimestamp() != null ? 
-                transaction.getTimestamp().format(DateTimeFormatter.ISO_LOCAL_DATE) : null);
+                transaction.getTimestamp().format(DateTimeFormatter.ISO_DATE_TIME) : null);
         
         // Set initiated by
         dto.setInitiatedBy(transaction.getInitiatedByUser() != null ? 
@@ -80,9 +80,9 @@ public class TransactionService {
         dto.setFromIban(transaction.getFromAccount() != null ? transaction.getFromAccount().getIban() : null);
         dto.setToIban(transaction.getToAccount() != null ? transaction.getToAccount().getIban() : null);
         
-        // Set date
+        // Set timestamp with both date and time
         dto.setDate(transaction.getTimestamp() != null ? 
-                transaction.getTimestamp().format(DateTimeFormatter.ISO_LOCAL_DATE) : null);
+                transaction.getTimestamp().format(DateTimeFormatter.ISO_DATE_TIME) : null);
         
         // Set initiated by
         dto.setInitiatedBy(transaction.getInitiatedByUser() != null ? 
@@ -173,7 +173,7 @@ public class TransactionService {
         List<Transaction> filteredTransactions = new ArrayList<>();
 
         for (Transaction tx : userTransactions) {
-            if (matchesFilters(tx, iban, ibanType, amount, comparator, start, end)) {
+            if (matchesFilters(tx, iban, ibanType, amount, comparator, start, end, null)) {
                 filteredTransactions.add(tx);
             }
         }
@@ -183,24 +183,40 @@ public class TransactionService {
 
     public List<Transaction> getFilteredTransactions(String iban, String ibanType, Double amount,
                                                      String comparator, String start, String end) {
+        return getFilteredTransactions(iban, ibanType, amount, comparator, start, end, null);
+    }
+    
+    public List<Transaction> getFilteredTransactions(String iban, String ibanType, Double amount,
+                                                     String comparator, String start, String end,
+                                                     String initiatedBy) {
         List<Transaction> allTransactions = transactionRepository.findAll();
         List<Transaction> filteredTransactions = new ArrayList<>();
 
         for (Transaction tx : allTransactions) {
-            if (matchesFilters(tx, iban, ibanType, amount, comparator, start, end)) {
+            if (matchesFilters(tx, iban, ibanType, amount, comparator, start, end, initiatedBy)) {
                 filteredTransactions.add(tx);
             }
         }
-
+        
+        // Sort by timestamp in descending order to show most recent transactions first
+        filteredTransactions.sort(Comparator.comparing(Transaction::getTimestamp).reversed());
+        
         return filteredTransactions;
     }
 
     private boolean matchesFilters(Transaction tx, String iban, String ibanType,
                                    Double amount, String comparator,
                                    String start, String end) {
+        return matchesFilters(tx, iban, ibanType, amount, comparator, start, end, null);
+    }
+
+    private boolean matchesFilters(Transaction tx, String iban, String ibanType,
+                                   Double amount, String comparator,
+                                   String start, String end, String initiatedBy) {
         return matchesIbanFilter(tx, iban, ibanType) &&
                 matchesAmountFilter(tx, amount, comparator) &&
-                matchesDateFilter(tx, start, end);
+                matchesDateFilter(tx, start, end) &&
+                matchesInitiatedByFilter(tx, initiatedBy);
     }
 
     private boolean matchesIbanFilter(Transaction tx, String iban, String ibanType) {
@@ -264,6 +280,15 @@ public class TransactionService {
         LocalDate txDate = tx.getTimestamp().toLocalDate();
 
         return !txDate.isAfter(endDate); // txDate <= endDate
+    }
+
+    private boolean matchesInitiatedByFilter(Transaction tx, String initiatedBy) {
+        if (initiatedBy == null || initiatedBy.isEmpty()) {
+            return true;
+        }
+        
+        return tx.getInitiatedByUser() != null &&
+                tx.getInitiatedByUser().getUsername().equalsIgnoreCase(initiatedBy);
     }
 
     public List<Transaction> getTransactionsByAccountId(Long accountId) {
