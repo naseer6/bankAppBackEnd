@@ -17,7 +17,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class TransactionService {
@@ -48,52 +47,52 @@ public class TransactionService {
     // Convert Transaction to TransactionDTO
     private TransactionDTO convertToDTO(Transaction transaction, List<String> userIbans) {
         TransactionDTO dto = new TransactionDTO();
-        
+
         dto.setId(transaction.getId());
         dto.setAmount(transaction.getAmount());
         dto.setDescription(transaction.getTransactionType());
-        
+
         // Set IBANs
         dto.setFromIban(transaction.getFromAccount() != null ? transaction.getFromAccount().getIban() : null);
         dto.setToIban(transaction.getToAccount() != null ? transaction.getToAccount().getIban() : null);
-        
+
         // Set timestamp with both date and time
-        dto.setDate(transaction.getTimestamp() != null ? 
+        dto.setDate(transaction.getTimestamp() != null ?
                 transaction.getTimestamp().format(DateTimeFormatter.ISO_DATE_TIME) : null);
-        
+
         // Set initiated by
-        dto.setInitiatedBy(transaction.getInitiatedByUser() != null ? 
+        dto.setInitiatedBy(transaction.getInitiatedByUser() != null ?
                 transaction.getInitiatedByUser().getUsername() : null);
-        
+
         // Add direction information
         String direction = determineDirection(transaction, userIbans);
         dto.setDirection(direction);
-        
+
         // Add signed amount
         Double signedAmount = determineSignedAmount(direction, transaction.getAmount());
         dto.setSignedAmount(signedAmount);
-        
+
         return dto;
     }
-    
+
     // Convert Transaction to TransactionDTO for admin view (all transactions)
     public TransactionDTO convertToAdminDTO(Transaction transaction) {
         TransactionDTO dto = new TransactionDTO();
-        
+
         dto.setId(transaction.getId());
         dto.setAmount(transaction.getAmount());
         dto.setDescription(transaction.getTransactionType());
         dto.setFromIban(transaction.getFromAccount() != null ? transaction.getFromAccount().getIban() : null);
         dto.setToIban(transaction.getToAccount() != null ? transaction.getToAccount().getIban() : null);
-        dto.setDate(transaction.getTimestamp() != null ? 
+        dto.setDate(transaction.getTimestamp() != null ?
                 transaction.getTimestamp().format(DateTimeFormatter.ISO_DATE_TIME) : null);
-        dto.setInitiatedBy(transaction.getInitiatedByUser() != null ? 
+        dto.setInitiatedBy(transaction.getInitiatedByUser() != null ?
                 transaction.getInitiatedByUser().getUsername() : null);
-        
+
         // For admin view, we don't calculate direction or signed amount
         dto.setDirection("Admin View");
         dto.setSignedAmount(transaction.getAmount());
-        
+
         return dto;
     }
 
@@ -103,9 +102,9 @@ public class TransactionService {
     public Page<TransactionDTO> getFilteredTransactionsWithDirection(
             User user, String iban, String ibanType, Double amount, String comparator,
             String start, String end, Pageable pageable) {
-        
+
         List<String> userIbans = getUserIbans(user);
-        
+
         // Parse filter parameters
         Double minAmount = null, maxAmount = null, exactAmount = null;
         if (amount != null && comparator != null) {
@@ -115,7 +114,7 @@ public class TransactionService {
                 case "=": exactAmount = amount; break;
             }
         }
-        
+
         // Parse dates
         LocalDateTime startDate = null, endDate = null;
         if (start != null && !start.isEmpty()) {
@@ -124,27 +123,28 @@ public class TransactionService {
         if (end != null && !end.isEmpty()) {
             endDate = LocalDate.parse(end, DateTimeFormatter.ISO_DATE).atTime(LocalTime.MAX);
         }
-        
+
         // Get filtered transactions from repository
         Page<Transaction> transactionsPage = transactionRepository.findFilteredByUser(
                 user, iban, ibanType, minAmount, maxAmount, exactAmount, startDate, endDate, pageable);
-        
+
         // Convert to DTOs with direction info
-        List<TransactionDTO> dtoList = transactionsPage.getContent().stream()
-                .map(tx -> convertToDTO(tx, userIbans))
-                .collect(Collectors.toList());
-        
+        List<TransactionDTO> dtoList = new ArrayList<>();
+        for (Transaction tx : transactionsPage.getContent()) {
+            dtoList.add(convertToDTO(tx, userIbans));
+        }
+
         return new PageImpl<>(dtoList, pageable, transactionsPage.getTotalElements());
     }
 
     // Non-paginated version for backward compatibility
     public List<TransactionDTO> getFilteredTransactionsWithDirection(
             User user, String iban, String ibanType, Double amount, String comparator, String start, String end) {
-        
+
         // Use paginated version but get all results
         Page<TransactionDTO> page = getFilteredTransactionsWithDirection(
                 user, iban, ibanType, amount, comparator, start, end, Pageable.unpaged());
-        
+
         return page.getContent();
     }
 
@@ -162,11 +162,13 @@ public class TransactionService {
     public Page<TransactionDTO> getTransactionsWithDirectionByUser(User user, Pageable pageable) {
         List<String> userIbans = getUserIbans(user);
         Page<Transaction> transactionsPage = transactionRepository.findByAccountOwner(user, pageable);
-        
-        List<TransactionDTO> transactionDTOs = transactionsPage.getContent().stream()
-                .map(tx -> convertToDTO(tx, userIbans))
-                .collect(Collectors.toList());
-                
+
+        List<TransactionDTO> transactionDTOs = new ArrayList<>();
+        for (Transaction tx : transactionsPage.getContent()) {
+            transactionDTOs.add(convertToDTO(tx, userIbans));
+        }
+
+
         return new PageImpl<>(transactionDTOs, pageable, transactionsPage.getTotalElements());
     }
 
@@ -174,23 +176,29 @@ public class TransactionService {
     public List<TransactionDTO> getTransactionsWithDirectionByUser(User user) {
         List<String> userIbans = getUserIbans(user);
         List<Transaction> transactions = transactionRepository.findByAccountOwner(user);
-        return transactions.stream()
-                .map(tx -> convertToDTO(tx, userIbans))
-                .collect(Collectors.toList());
+        List<TransactionDTO> dtos = new ArrayList<>();
+        for (Transaction tx : transactions) {
+            dtos.add(convertToDTO(tx, userIbans));
+        }
+        return dtos;
+
     }
 
     // Helper method to get user's IBANs
     public List<String> getUserIbans(User user) {
         List<BankAccount> userAccounts = bankAccountRepository.findAllByOwner(user);
-        return userAccounts.stream()
-            .map(BankAccount::getIban)
-            .collect(Collectors.toList());
+        List<String> ibans = new ArrayList<>();
+        for (BankAccount acc : userAccounts) {
+            ibans.add(acc.getIban());
+        }
+        return ibans;
+
     }
 
     private String determineDirection(Transaction tx, List<String> userIbans) {
-        boolean isFromUserAccount = tx.getFromAccount() != null && 
+        boolean isFromUserAccount = tx.getFromAccount() != null &&
                 userIbans.contains(tx.getFromAccount().getIban());
-        boolean isToUserAccount = tx.getToAccount() != null && 
+        boolean isToUserAccount = tx.getToAccount() != null &&
                 userIbans.contains(tx.getToAccount().getIban());
 
         if (isFromUserAccount && isToUserAccount) return "Internal";
@@ -200,19 +208,19 @@ public class TransactionService {
     }
 
     private Double determineSignedAmount(String direction, Double amount) {
-        switch (direction) {
-            case "Outgoing": return -Math.abs(amount);
-            case "Incoming": return Math.abs(amount);
-            case "Internal": return Math.abs(amount); // Use positive value for internal transfers
-            default: return amount;
-        }
+        return switch (direction) {
+            case "Outgoing" -> -Math.abs(amount);
+            case "Incoming" -> Math.abs(amount);
+            case "Internal" -> Math.abs(amount); // Use positive value for internal transfers
+            default -> amount;
+        };
     }
 
     // Admin filtered transactions with pagination
     public Page<Transaction> getFilteredTransactions(
             String iban, String ibanType, Double amount, String comparator,
             String start, String end, String initiatedBy, Pageable pageable) {
-        
+
         // Parse filter parameters
         Double minAmount = null, maxAmount = null, exactAmount = null;
         if (amount != null && comparator != null) {
@@ -222,7 +230,7 @@ public class TransactionService {
                 case "=": exactAmount = amount; break;
             }
         }
-        
+
         // Parse dates
         LocalDateTime startDate = null, endDate = null;
         if (start != null && !start.isEmpty()) {
@@ -231,7 +239,7 @@ public class TransactionService {
         if (end != null && !end.isEmpty()) {
             endDate = LocalDate.parse(end, DateTimeFormatter.ISO_DATE).atTime(LocalTime.MAX);
         }
-        
+
         return transactionRepository.findFiltered(
                 iban, ibanType, minAmount, maxAmount, exactAmount, startDate, endDate, initiatedBy, pageable);
     }
@@ -250,7 +258,7 @@ public class TransactionService {
         return getFilteredTransactions(iban, ibanType, amount, comparator, start, end, null, Pageable.unpaged())
                 .getContent();
     }
-    
+
     public List<Transaction> getFilteredTransactions(String iban, String ibanType, Double amount,
                                                     String comparator, String start, String end,
                                                     String initiatedBy) {
