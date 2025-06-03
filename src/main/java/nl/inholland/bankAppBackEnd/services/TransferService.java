@@ -251,4 +251,83 @@ public class TransferService {
                 String.format("✅ Successfully updated limits for account %s. Absolute limit: €%.2f, Daily limit: €%.2f",
                         iban, account.getAbsoluteLimit(), account.getDailyLimit()));
     }
+
+    @Transactional
+    public TransferResult internalTransfer(String fromIban, String toIban, Double amount, User initiatedBy) {
+        // Validate inputs
+        if (amount == null || amount <= 0) {
+            return new TransferResult(false, "❌ Transfer amount must be greater than zero");
+        }
+
+        // Find accounts
+        Optional<BankAccount> fromAccountOpt = bankAccountRepository.findByIban(fromIban);
+        Optional<BankAccount> toAccountOpt = bankAccountRepository.findByIban(toIban);
+
+        if (fromAccountOpt.isEmpty()) {
+            return new TransferResult(false, "❌ Source account not found");
+        }
+        if (toAccountOpt.isEmpty()) {
+            return new TransferResult(false, "❌ Destination account not found");
+        }
+
+        BankAccount fromAccount = fromAccountOpt.get();
+        BankAccount toAccount = toAccountOpt.get();
+
+        // Verify both accounts belong to the same user
+        if (!fromAccount.getOwner().getId().equals(initiatedBy.getId()) ||
+                !toAccount.getOwner().getId().equals(initiatedBy.getId())) {
+            return new TransferResult(false, "❌ Internal transfers can only be made between your own accounts");
+        }
+
+        // Check if same account
+        if (fromAccount.getId().equals(toAccount.getId())) {
+            return new TransferResult(false, "❌ Cannot transfer to the same account");
+        }
+
+        // For internal transfers, use a special validation without account type restriction
+        TransferResult validationResult = validateInternalTransferLimits(fromAccount, amount, initiatedBy);
+        if (!validationResult.isSuccess()) {
+            return validationResult;
+        }
+
+        // Perform the transfer
+        fromAccount.setBalance(fromAccount.getBalance() - amount);
+        toAccount.setBalance(toAccount.getBalance() + amount);
+
+        // Save accounts
+        bankAccountRepository.save(fromAccount);
+        bankAccountRepository.save(toAccount);
+
+        // Create transaction record
+        Transaction transaction = new Transaction();
+        transaction.setFromAccount(fromAccount);
+        transaction.setToAccount(toAccount);
+        transaction.setAmount(amount);
+        transaction.setTransactionType("INTERNAL_TRANSFER");
+        transaction.setTimestamp(LocalDateTime.now());
+        transaction.setInitiatedByUser(initiatedBy);
+
+        transaction = transactionRepository.save(transaction);
+
+        return new TransferResult(true,
+                String.format("✅ Successfully transferred €%.2f between your accounts (%s → %s)",
+                        amount, fromIban, toIban), transaction);
+    }
+
+    private TransferResult validateInternalTransferLimits(BankAccount fromAccount, Double amount, User initiatedBy) {
+        // Check absolute limit (minimum balance)
+        if (fromAccount.wouldViolateAbsoluteLimit(amount)) {
+            double availableAmount = fromAccount.getBalance() - fromAccount.getAbsoluteLimit();
+            return new TransferResult(false,
+                    String.format("❌ Transfer would exceed absolute limit. Available amount: €%.2f",
+                            Math.max(0, availableAmount)));
+        }
+
+        // Check sufficient balance
+        if (fromAccount.getBalance() < amount) {
+            return new TransferResult(false, "❌ Insufficient balance");
+        }
+
+        return new TransferResult(true, "Validation passed");
+    }
 }

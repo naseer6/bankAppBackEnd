@@ -37,6 +37,9 @@ public class SecurityConfig {
                 .and()
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/h2-console/**", "/api/users/register", "/api/users/login").permitAll()
+                        // Allow Swagger UI access
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", 
+                                         "/swagger-resources/**", "/webjars/**", "/swagger-ui/index.html").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/accounts/create").hasRole("ADMIN")
                         .anyRequest().authenticated()

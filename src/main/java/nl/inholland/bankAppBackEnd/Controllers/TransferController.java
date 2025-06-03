@@ -209,4 +209,53 @@ public class TransferController {
             ));
         }
     }
+
+    @PostMapping("/internal")
+    public ResponseEntity<?> internalTransfer(@RequestBody Map<String, Object> requestBody) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("success", false, "message", "❌ Not authenticated")
+            );
+        }
+
+        // Only approved users can make transfers
+        if (currentUser.getRole() == User.Role.USER && !currentUser.isApproved()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    Map.of("success", false, "message", "❌ Your account is not yet approved for transfers")
+            );
+        }
+
+        try {
+            String fromIban = (String) requestBody.get("fromIban");
+            String toIban = (String) requestBody.get("toIban");
+            Double amount = Double.valueOf(requestBody.get("amount").toString());
+
+            if (fromIban == null || toIban == null || amount == null) {
+                return ResponseEntity.badRequest().body(
+                        Map.of("success", false, "message", "❌ Missing required fields: fromIban, toIban, amount")
+                );
+            }
+
+            TransferService.TransferResult result = transferService.internalTransfer(fromIban, toIban, amount, currentUser);
+
+            if (result.isSuccess()) {
+                return ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "message", result.getMessage(),
+                        "transaction", result.getTransaction()
+                ));
+            } else {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", result.getMessage()
+                ));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "❌ Invalid request format: " + e.getMessage()
+            ));
+        }
+    }
 }
