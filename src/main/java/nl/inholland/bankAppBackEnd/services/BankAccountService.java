@@ -8,9 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 
 @Service
 public class BankAccountService {
@@ -108,4 +106,26 @@ public class BankAccountService {
                 .filter(BankAccount::isActive)
                 .count();
     }
+
+    public Map<String, Object> getLimitsForUser(String iban, User currentUser) {
+        BankAccount account = bankAccountRepository.findByIban(iban)
+                .orElseThrow(() -> new NoSuchElementException("❌ Account not found"));
+
+        if (currentUser.getRole() == User.Role.USER &&
+                !account.getOwner().getId().equals(currentUser.getId())) {
+            throw new SecurityException("❌ You can only view your own account limits");
+        }
+
+        Map<String, Object> limits = new HashMap<>();
+        limits.put("iban", account.getIban());
+        limits.put("absoluteLimit", account.getAbsoluteLimit());
+        limits.put("dailyLimit", account.getDailyLimit());
+        limits.put("dailySpent", account.getDailySpent());
+        limits.put("remainingDailyLimit", account.getRemainingDailyLimit());
+        limits.put("balance", account.getBalance());
+        limits.put("availableBalance", Math.max(0, account.getBalance() - account.getAbsoluteLimit()));
+
+        return limits;
+    }
+
 }

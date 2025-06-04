@@ -9,6 +9,7 @@ import nl.inholland.bankAppBackEnd.services.TransferService;
 import nl.inholland.bankAppBackEnd.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -152,6 +153,8 @@ public class BankAccountController {
         }
     }
 
+
+
     @PostMapping("/update-limits")
     public ResponseEntity<?> updateLimits(@RequestParam String iban,
                                           @RequestParam(required = false) Double absoluteLimit,
@@ -175,6 +178,10 @@ public class BankAccountController {
             ));
         }
     }
+
+
+
+
 
     @GetMapping("/balance")
     public ResponseEntity<?> getBalances(@RequestParam Long userId) {
