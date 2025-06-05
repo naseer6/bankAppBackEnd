@@ -43,12 +43,22 @@ public class ATMController {
         }
 
         try {
-            String iban = (String) requestBody.get("iban");
-            Double amount = Double.valueOf(requestBody.get("amount").toString());
-
-            if (iban == null || amount == null) {
+            if (!requestBody.containsKey("iban") || !requestBody.containsKey("amount") ||
+                    requestBody.get("iban") == null || requestBody.get("amount") == null) {
                 return ResponseEntity.badRequest().body(
                         createErrorResponse("❌ Missing required fields: iban, amount")
+                );
+            }
+
+            String iban = requestBody.get("iban").toString();
+            Object amountObj = requestBody.get("amount");
+
+            Double amount;
+            try {
+                amount = Double.valueOf(amountObj.toString());
+            } catch (NumberFormatException e) {
+                return ResponseEntity.badRequest().body(
+                        createErrorResponse("❌ Invalid amount format")
                 );
             }
 
@@ -59,12 +69,16 @@ public class ATMController {
             } else {
                 return ResponseEntity.badRequest().body(createErrorResponse(result.getMessage()));
             }
+
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(
                     createErrorResponse("❌ Invalid request format: " + e.getMessage())
             );
         }
     }
+
+
+
 
     @PostMapping("/deposit")
     public ResponseEntity<?> atmDeposit(@RequestBody Map<String, Object> requestBody) {
