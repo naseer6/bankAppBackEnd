@@ -21,9 +21,8 @@ public class ATMService {
 
     @Autowired
     private TransactionRepository transactionRepository;
-
     @Autowired
-    private TransferService transferService;
+    private TransactionService transactionService;
 
     public static class ATMResult {
         private boolean success;
@@ -91,7 +90,7 @@ public class ATMService {
         }
 
         // Use transfer service for consistent limit validation
-        TransferService.TransferResult result = transferService.withdraw(iban, amount, user);
+        TransactionService.TransferResult result = transactionService.withdraw(iban, amount, user);
 
         if (result.isSuccess()) {
             // Refresh account data
@@ -129,7 +128,7 @@ public class ATMService {
         }
 
         // Use transfer service for consistent processing
-        TransferService.TransferResult result = transferService.deposit(iban, amount, user);
+        TransactionService.TransferResult result = transactionService.deposit(iban, amount, user);
 
         if (result.isSuccess()) {
             // Refresh account data
@@ -172,7 +171,7 @@ public class ATMService {
         }
 
         // Use transfer service for consistent processing
-        TransferService.TransferResult result = transferService.transferFunds(fromIban, toIban, amount, user);
+        TransactionService.TransferResult result = transactionService.transferFunds(fromIban, toIban, amount, user);
 
         if (result.isSuccess()) {
             // Refresh account data

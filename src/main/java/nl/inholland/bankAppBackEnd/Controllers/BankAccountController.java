@@ -5,11 +5,10 @@ import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.repository.BankAccountRepository;
 import nl.inholland.bankAppBackEnd.repository.UserRepository;
 import nl.inholland.bankAppBackEnd.services.BankAccountService;
-import nl.inholland.bankAppBackEnd.services.TransferService;
+import nl.inholland.bankAppBackEnd.services.TransactionService;
 import nl.inholland.bankAppBackEnd.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,9 +25,6 @@ public class BankAccountController {
     private BankAccountService bankAccountService;
 
     @Autowired
-    private TransferService transferService;
-
-    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -36,6 +32,8 @@ public class BankAccountController {
 
     @Autowired
     private BankAccountRepository bankAccountRepository;
+    @Autowired
+    private TransactionService transactionService;
 
     private User getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -89,7 +87,7 @@ public class BankAccountController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Not authenticated");
         }
 
-        TransferService.TransferResult result = transferService.transferFunds(fromIban, toIban, amount, currentUser);
+        TransactionService.TransferResult result = transactionService.transferFunds(fromIban, toIban, amount, currentUser);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(Map.of(
@@ -113,7 +111,7 @@ public class BankAccountController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Not authenticated");
         }
 
-        TransferService.TransferResult result = transferService.deposit(iban, amount, currentUser);
+        TransactionService.TransferResult result = transactionService.deposit(iban, amount, currentUser);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(Map.of(
@@ -137,7 +135,7 @@ public class BankAccountController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Not authenticated");
         }
 
-        TransferService.TransferResult result = transferService.withdraw(iban, amount, currentUser);
+        TransactionService.TransferResult result = transactionService.withdraw(iban, amount, currentUser);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(Map.of(
@@ -164,7 +162,7 @@ public class BankAccountController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Not authenticated");
         }
 
-        TransferService.TransferResult result = transferService.updateAccountLimits(iban, absoluteLimit, dailyLimit, currentUser);
+        TransactionService.TransferResult result = transactionService.updateAccountLimits(iban, absoluteLimit, dailyLimit, currentUser);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(Map.of(
