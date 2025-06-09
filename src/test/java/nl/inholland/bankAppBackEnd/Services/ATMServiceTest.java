@@ -29,9 +29,6 @@ class ATMServiceTest {
     @Mock
     private TransactionService transactionService;
 
-    @InjectMocks
-    private ATMService atmService;
-
     private User user;
     private BankAccount account;
 
@@ -58,7 +55,7 @@ class ATMServiceTest {
         when(transactionService.withdraw(account.getIban(), 100.0, user))
                 .thenReturn(new TransactionService.TransferResult(true, "✅ OK", tx));
 
-        ATMService.ATMResult result = atmService.atmWithdraw(account.getIban(), 100.0, user);
+        TransactionService.ATMResult result = transactionService.atmWithdraw(account.getIban(), 100.0, user);
 
         assertTrue(result.isSuccess());
         assertEquals(100.0, result.getTransaction().getAmount(), 0.01);
@@ -67,7 +64,7 @@ class ATMServiceTest {
 
     @Test
     void atmWithdraw_ShouldFail_WhenAmountIsInvalid() {
-        ATMService.ATMResult result = atmService.atmWithdraw(account.getIban(), -50.0, user);
+        TransactionService.ATMResult result = transactionService.atmWithdraw(account.getIban(), -50.0, user);
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Invalid withdrawal amount"));
     }
@@ -80,7 +77,7 @@ class ATMServiceTest {
 
         when(bankAccountRepository.findByIban(account.getIban())).thenReturn(Optional.of(account));
 
-        ATMService.ATMResult result = atmService.atmWithdraw(account.getIban(), 100.0, user);
+        TransactionService.ATMResult result = transactionService.atmWithdraw(account.getIban(), 100.0, user);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Unauthorized"));
@@ -94,7 +91,7 @@ class ATMServiceTest {
         when(transactionService.deposit(account.getIban(), 500.0, user))
                 .thenReturn(new TransactionService.TransferResult(true, "✅ Deposit OK", tx));
 
-        ATMService.ATMResult result = atmService.atmDeposit(account.getIban(), 500.0, user);
+        TransactionService.ATMResult result = transactionService.atmDeposit(account.getIban(), 500.0, user);
 
         assertTrue(result.isSuccess());
         assertTrue(result.getMessage().contains("Deposit successful"));
@@ -102,7 +99,7 @@ class ATMServiceTest {
 
     @Test
     void atmDeposit_ShouldFail_WhenOverLimit() {
-        ATMService.ATMResult result = atmService.atmDeposit(account.getIban(), 5000.0, user);
+        TransactionService.ATMResult result = transactionService.atmDeposit(account.getIban(), 5000.0, user);
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("deposit limit"));
     }
@@ -116,7 +113,7 @@ class ATMServiceTest {
         when(transactionService.transferFunds(account.getIban(), toIban, 300.0, user))
                 .thenReturn(new TransactionService.TransferResult(true, "✅ Transfer OK", tx));
 
-        ATMService.ATMResult result = atmService.atmTransfer(account.getIban(), toIban, 300.0, user);
+        TransactionService.ATMResult result = transactionService.atmTransfer(account.getIban(), toIban, 300.0, user);
 
         assertTrue(result.isSuccess());
         assertTrue(result.getMessage().contains("Transfer OK"));
@@ -127,7 +124,7 @@ class ATMServiceTest {
         account.setType(BankAccount.AccountType.SAVINGS);
         when(bankAccountRepository.findByIban(account.getIban())).thenReturn(Optional.of(account));
 
-        ATMService.ATMResult result = atmService.atmTransfer(account.getIban(), "OTHER", 200.0, user);
+        TransactionService.ATMResult result = transactionService.atmTransfer(account.getIban(), "OTHER", 200.0, user);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("only allowed from checking"));
@@ -137,7 +134,7 @@ class ATMServiceTest {
     void getAccountSummary_ShouldSucceed_WhenUserOwnsAccount() {
         when(bankAccountRepository.findByIban(account.getIban())).thenReturn(Optional.of(account));
 
-        ATMService.ATMResult result = atmService.getAccountSummary(account.getIban(), user);
+        TransactionService.ATMResult result = transactionService.getAccountSummary(account.getIban(), user);
 
         assertTrue(result.isSuccess());
         assertEquals(1000.0, result.getNewBalance());
@@ -151,7 +148,7 @@ class ATMServiceTest {
 
         when(bankAccountRepository.findByIban(account.getIban())).thenReturn(Optional.of(account));
 
-        ATMService.ATMResult result = atmService.getAccountSummary(account.getIban(), user);
+        TransactionService.ATMResult result = transactionService.getAccountSummary(account.getIban(), user);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Unauthorized"));
@@ -159,7 +156,7 @@ class ATMServiceTest {
 
     @Test
     void getATMStatus_ShouldReturnOperationalMessage() {
-        String result = atmService.getATMStatus();
+        String result = transactionService.getATMStatus();
         assertTrue(result.contains("operational"));
     }
 }
