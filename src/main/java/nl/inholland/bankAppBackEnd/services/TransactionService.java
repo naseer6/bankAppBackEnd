@@ -46,15 +46,56 @@ public class TransactionService {
         return transactionRepository.findById(id);
     }
 
+    private String determineDirection(Transaction tx, List<String> userIbans) {
+        boolean isFromUserAccount = tx.getFromAccount() != null &&
+                userIbans.contains(tx.getFromAccount().getIban());
+        boolean isToUserAccount = tx.getToAccount() != null &&
+                userIbans.contains(tx.getToAccount().getIban());
+
+        // Handle deposit cases - fromAccount is null
+        if (tx.getFromAccount() == null && tx.getToAccount() != null && userIbans.contains(tx.getToAccount().getIban())) {
+            return "Incoming";
+        }
+        
+        // Handle withdrawal cases - toAccount is null
+        if (tx.getToAccount() == null && tx.getFromAccount() != null && userIbans.contains(tx.getFromAccount().getIban())) {
+            return "Outgoing";
+        }
+
+        if (isFromUserAccount && isToUserAccount) return "Internal";
+        if (isFromUserAccount) return "Outgoing";
+        if (isToUserAccount) return "Incoming";
+        return "External";
+    }
+
+    private Double determineSignedAmount(String direction, Double amount) {
+        return switch (direction) {
+            case "Outgoing" -> -Math.abs(amount);
+            case "Incoming" -> Math.abs(amount);
+            case "Internal" -> Math.abs(amount); // Use positive value for internal transfers
+            default -> amount;
+        };
+    }
+
     // Convert Transaction to TransactionDTO
     private TransactionDTO convertToDTO(Transaction transaction, List<String> userIbans) {
         TransactionDTO dto = new TransactionDTO();
 
         dto.setId(transaction.getId());
         dto.setAmount(transaction.getAmount());
-        dto.setDescription(transaction.getTransactionType());
+        
+        // Simplify ATM transaction types for user display
+        String description = transaction.getTransactionType();
+        if (description.equals("WITHDRAWAL")) {
+            description = "Withdrawal";
+        } else if (description.equals("DEPOSIT")) {
+            description = "Deposit";
+        } else if (description.equals("TRANSFER")) {
+            description = "Transfer";
+        }
+        dto.setDescription(description);
 
-        // Set IBANs
+        // Set IBANs, handle null values properly
         dto.setFromIban(transaction.getFromAccount() != null ? transaction.getFromAccount().getIban() : null);
         dto.setToIban(transaction.getToAccount() != null ? transaction.getToAccount().getIban() : null);
 
@@ -83,7 +124,18 @@ public class TransactionService {
 
         dto.setId(transaction.getId());
         dto.setAmount(transaction.getAmount());
-        dto.setDescription(transaction.getTransactionType());
+        
+        // Simplify ATM transaction types for admin display
+        String description = transaction.getTransactionType();
+        if (description.equals("WITHDRAWAL")) {
+            description = "Withdrawal";
+        } else if (description.equals("DEPOSIT")) {
+            description = "Deposit";
+        } else if (description.equals("TRANSFER")) {
+            description = "Transfer";
+        }
+        dto.setDescription(description);
+        
         dto.setFromIban(transaction.getFromAccount() != null ? transaction.getFromAccount().getIban() : null);
         dto.setToIban(transaction.getToAccount() != null ? transaction.getToAccount().getIban() : null);
         dto.setDate(transaction.getTimestamp() != null ?
@@ -91,9 +143,26 @@ public class TransactionService {
         dto.setInitiatedBy(transaction.getInitiatedByUser() != null ?
                 transaction.getInitiatedByUser().getUsername() : null);
 
-        // For admin view, we don't calculate direction or signed amount
-        dto.setDirection("Admin View");
-        dto.setSignedAmount(transaction.getAmount());
+        // For admin view, determine transaction direction based on transaction type
+        String direction;
+        if (transaction.getFromAccount() == null && transaction.getToAccount() != null) {
+            direction = "Deposit";
+        } else if (transaction.getToAccount() == null && transaction.getFromAccount() != null) {
+            direction = "Withdrawal";
+        } else if (transaction.getFromAccount() != null && transaction.getToAccount() != null) {
+            direction = "Transfer";
+        } else {
+            direction = "Unknown";
+        }
+        
+        dto.setDirection(direction);
+        
+        // For admin, show actual amount (positive for deposits, negative for withdrawals)
+        if (direction.equals("Withdrawal")) {
+            dto.setSignedAmount(-transaction.getAmount());
+        } else {
+            dto.setSignedAmount(transaction.getAmount());
+        }
 
         return dto;
     }
@@ -192,27 +261,6 @@ public class TransactionService {
         return userAccounts.stream()
             .map(BankAccount::getIban)
             .collect(Collectors.toList());
-    }
-
-    private String determineDirection(Transaction tx, List<String> userIbans) {
-        boolean isFromUserAccount = tx.getFromAccount() != null &&
-                userIbans.contains(tx.getFromAccount().getIban());
-        boolean isToUserAccount = tx.getToAccount() != null &&
-                userIbans.contains(tx.getToAccount().getIban());
-
-        if (isFromUserAccount && isToUserAccount) return "Internal";
-        if (isFromUserAccount) return "Outgoing";
-        if (isToUserAccount) return "Incoming";
-        return "External";
-    }
-
-    private Double determineSignedAmount(String direction, Double amount) {
-        return switch (direction) {
-            case "Outgoing" -> -Math.abs(amount);
-            case "Incoming" -> Math.abs(amount);
-            case "Internal" -> Math.abs(amount); // Use positive value for internal transfers
-            default -> amount;
-        };
     }
 
     // Admin filtered transactions with pagination
@@ -498,7 +546,7 @@ public class TransactionService {
         Transaction transaction = createTransactionRecord(account, null, amount, "WITHDRAWAL", initiatedBy);
 
         return new TransferResult(true,
-                String.format("✅ Successfully withdrew €%.2f from %s. New balance: €%.2f",
+                String.format("✅ Successfully withdrew €%.2f from %s, please collect your cash! New balance: €%.2f",
                         amount, iban, account.getBalance()), transaction);
     }
 
@@ -634,19 +682,53 @@ public class TransactionService {
 
     @Transactional
     public ATMResult atmWithdraw(String iban, Double amount, User user) {
-        // Enhanced ATM withdrawal with detailed validation and logging
         if (amount == null || amount <= 0) {
             return new ATMResult(false, "❌ Invalid withdrawal amount");
         }
 
-        // Check for common ATM denominations (optional business rule)
-        if (!isValidATMDenomination(amount)) {
-            return new ATMResult(false, "❌ ATM can only dispense amounts in €10 increments");
+        // Validation checks...
+
+        Optional<BankAccount> accountOpt = bankAccountRepository.findByIban(iban);
+        if (accountOpt.isEmpty()) {
+            return new ATMResult(false, "❌ Account not found");
         }
 
-        // Check ATM daily cash limits (simulated)
-        if (amount > 500) {
-            return new ATMResult(false, "❌ ATM daily withdrawal limit is €500 per transaction");
+        BankAccount account = accountOpt.get();
+
+        // All validation checks...
+
+        // Instead of calling withdraw() and updating later,
+        // perform the withdrawal directly with proper transaction type
+
+        // Validate withdrawal limits
+        TransferResult validationResult = validateTransferLimits(account, amount, user);
+        if (!validationResult.isSuccess()) {
+            return new ATMResult(false, validationResult.getMessage());
+        }
+
+        account.setBalance(account.getBalance() - amount);
+        account.addToDailySpent(amount);
+        bankAccountRepository.save(account);
+
+        // Create transaction record with ATM_WITHDRAWAL directly
+        Transaction transaction = createTransactionRecord(account, null, amount, "WITHDRAWAL", user);
+
+        return new ATMResult(true,
+                String.format("✅ Successfully withdrew €%.2f from ATM. New balance: €%.2f",
+                        amount, account.getBalance()),
+                account,
+                transaction);
+    }
+
+    @Transactional
+    public ATMResult atmDeposit(String iban, Double amount, User user) {
+        if (amount == null || amount <= 0) {
+            return new ATMResult(false, "❌ Invalid deposit amount");
+        }
+
+        // ATM deposit limits (simulate cash handling limits)
+        if (amount > 2000) {
+            return new ATMResult(false, "❌ ATM deposit limit is €2000 per transaction");
         }
 
         Optional<BankAccount> accountOpt = bankAccountRepository.findByIban(iban);
@@ -662,65 +744,22 @@ public class TransactionService {
         }
 
         // Check if account is active/approved
-        if (!account.getOwner().isApproved()) {
+        if (!account.isActive() || !account.getOwner().isApproved()) {
             return new ATMResult(false, "❌ Account is not active for ATM transactions");
         }
-        
-        // Check account type - only allow withdrawals from checking accounts
-        if (account.getType() != BankAccount.AccountType.CHECKING) {
-            return new ATMResult(false, "❌ ATM withdrawals can only be made from checking accounts");
-        }
 
-        // Use withdraw method for consistent limit validation
-        TransferResult result = withdraw(iban, amount, user);
+        // Update account balance
+        account.setBalance(account.getBalance() + amount);
+        bankAccountRepository.save(account);
 
-        if (result.isSuccess()) {
-            // Refresh account data
-            account = bankAccountRepository.findByIban(iban).get();
-            return new ATMResult(true,
-                    String.format("✅ Withdrawal successful. Please collect your cash: €%.2f", amount),
-                    account, result.getTransaction());
-        } else {
-            return new ATMResult(false, result.getMessage());
-        }
-    }
+        // Create transaction record with ATM_DEPOSIT type directly
+        Transaction transaction = createTransactionRecord(null, account, amount, "ATM_DEPOSIT", user);
 
-    @Transactional
-    public ATMResult atmDeposit(String iban, Double amount, User user) {
-        // Enhanced ATM deposit with validation
-        if (amount == null || amount <= 0) {
-            return new ATMResult(false, "❌ Invalid deposit amount");
-        }
-
-        // ATM deposit limits (simulate cash handling limits)
-        if (amount > 2000) {
-            return new ATMResult(false, "❌ ATM deposit limit is €2,000 per transaction");
-        }
-
-        Optional<BankAccount> accountOpt = bankAccountRepository.findByIban(iban);
-        if (accountOpt.isEmpty()) {
-            return new ATMResult(false, "❌ Account not found");
-        }
-
-        BankAccount account = accountOpt.get();
-
-        // Verify account ownership
-        if (!account.getOwner().getId().equals(user.getId())) {
-            return new ATMResult(false, "❌ Unauthorized access to account");
-        }
-
-        // Use deposit method for consistent processing
-        TransferResult result = deposit(iban, amount, user);
-
-        if (result.isSuccess()) {
-            // Refresh account data
-            account = bankAccountRepository.findByIban(iban).get();
-            return new ATMResult(true,
-                    String.format("✅ Deposit successful. Your cash has been processed: €%.2f", amount),
-                    account, result.getTransaction());
-        } else {
-            return new ATMResult(false, result.getMessage());
-        }
+        return new ATMResult(true,
+                String.format("✅ Successfully deposited €%.2f at ATM. New balance: €%.2f",
+                        amount, account.getBalance()),
+                account,
+                transaction);
     }
 
     @Transactional
@@ -756,9 +795,19 @@ public class TransactionService {
         TransferResult result = transferFunds(fromIban, toIban, amount, user);
 
         if (result.isSuccess()) {
+            // Get the transaction created by the transfer method
+            Transaction transaction = result.getTransaction();
+            
+            // Update the transaction type to ATM_TRANSFER
+            if (transaction != null) {
+                transaction.setTransactionType("TRANSFER");
+                transaction = transactionRepository.save(transaction);
+            }
+            
             // Refresh account data
             fromAccount = bankAccountRepository.findByIban(fromIban).get();
-            return new ATMResult(true, result.getMessage(), fromAccount, result.getTransaction());
+            
+            return new ATMResult(true, result.getMessage(), fromAccount, transaction);
         } else {
             return new ATMResult(false, result.getMessage());
         }

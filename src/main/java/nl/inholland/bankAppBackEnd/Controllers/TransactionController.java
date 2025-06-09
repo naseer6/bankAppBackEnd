@@ -98,53 +98,50 @@ public class TransactionController {
         return ResponseEntity.ok(response);
     }
 
-    private ResponseEntity<?> handleServiceResult(Supplier<TransactionService.TransferResult> serviceCall) {
+    private ResponseEntity<?> handleTransactionResult(Supplier<Object> serviceCall, boolean isATM) {
         try {
-            TransactionService.TransferResult result = serviceCall.get();
-            if (result.isSuccess()) {
-                return createSuccessResponse(result.getMessage(),
-                        Map.of("transaction", result.getTransaction()));
-            } else {
-                return ResponseEntity.badRequest().body(
-                        Map.of("success", false, "message", result.getMessage()));
+            Object result = serviceCall.get();
+
+            if (isATM && result instanceof TransactionService.ATMResult) {
+                TransactionService.ATMResult atmResult = (TransactionService.ATMResult) result;
+                if (atmResult.isSuccess()) {
+                    return createSuccessResponse(atmResult.getMessage(), createATMResponseData(atmResult));
+                } else {
+                    return createErrorResponse(HttpStatus.BAD_REQUEST, atmResult.getMessage());
+                }
+            } else if (!isATM && result instanceof TransactionService.TransferResult) {
+                TransactionService.TransferResult transferResult = (TransactionService.TransferResult) result;
+                if (transferResult.isSuccess()) {
+                    return createSuccessResponse(transferResult.getMessage(),
+                            Map.of("transaction", transferResult.getTransaction()));
+                } else {
+                    return ResponseEntity.badRequest().body(
+                            Map.of("success", false, "message", transferResult.getMessage()));
+                }
             }
+
+            return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "❌ Unexpected result type");
         } catch (Exception e) {
-            return createErrorResponse(HttpStatus.BAD_REQUEST, "❌ Invalid request: " + e.getMessage());
+            e.printStackTrace();
+            String errorMessage = determineErrorMessage(e);
+            return createErrorResponse(HttpStatus.BAD_REQUEST, errorMessage);
         }
     }
 
-    private ResponseEntity<?> handleATMResult(Supplier<TransactionService.ATMResult> serviceCall) {
-        try {
-            TransactionService.ATMResult result = serviceCall.get();
-            if (result.isSuccess()) {
-                return createSuccessResponse(result.getMessage(), createATMResponseData(result));
+    private String determineErrorMessage(Exception e) {
+        if (e.getMessage() != null) {
+            if (e.getMessage().contains("absolute limit")) {
+                return "❌ Transaction would exceed your account's minimum balance limit";
+            } else if (e.getMessage().contains("daily limit")) {
+                return "❌ You've reached your daily transaction limit for this account";
+            } else if (e.getMessage().contains("CHECKING") || e.getMessage().toLowerCase().contains("savings")) {
+                return "❌ This transaction is not allowed for this account type";
             } else {
-                return createErrorResponse(HttpStatus.BAD_REQUEST, result.getMessage());
+                return "❌ " + e.getMessage();
             }
-        } catch (Exception e) {
-            // Improve error logging and messaging with specific error detection
-            e.printStackTrace(); // Log the full stack trace
-            String errorMessage;
-            
-            // Check for specific error types and provide more helpful messages
-            if (e.getMessage() != null) {
-                if (e.getMessage().contains("absolute limit")) {
-                    errorMessage = "❌ Transaction would exceed your account's minimum balance limit";
-                } else if (e.getMessage().contains("daily limit")) {
-                    errorMessage = "❌ You've reached your daily transaction limit for this account";
-                } else if (e.getMessage().contains("CHECKING") || e.getMessage().toLowerCase().contains("savings")) {
-                    errorMessage = "❌ This transaction is not allowed for this account type";
-                } else {
-                    errorMessage = "❌ " + e.getMessage();
-                }
-            } else {
-                // Default message with current timestamp for tracing
-                errorMessage = "❌ Transaction failed. Please try again or contact support. (Error ID: " + 
-                               System.currentTimeMillis() % 10000 + ")";
-            }
-            
-            return createErrorResponse(HttpStatus.BAD_REQUEST, errorMessage);
         }
+        return "❌ Transaction failed. Please try again or contact support. (Error ID: " +
+                System.currentTimeMillis() % 10000 + ")";
     }
 
     private Map<String, Object> createATMResponseData(TransactionService.ATMResult result) {
@@ -159,26 +156,28 @@ public class TransactionController {
             data.put("availableBalance", result.getAvailableBalance());
         }
         if (result.getTransaction() != null) {
-            data.put("transaction", result.getTransaction());
+            data.put("transaction", result.getTransaction()); // Include transaction in response
         }
         return data;
     }
 
     // ===================== VALIDATION HELPERS =====================
 
-    private ResponseEntity<?> validateTransferRequest(Map<String, Object> requestBody,
-                                                      String... requiredFields) {
+    private ResponseEntity<?> validateTransferRequest(Map<String, Object> requestBody, String... requiredFields) {
         for (String field : requiredFields) {
             if (!requestBody.containsKey(field) || requestBody.get(field) == null) {
-                return createErrorResponse(HttpStatus.BAD_REQUEST,
-                        "❌ Missing required field: " + field);
+                return createErrorResponse(HttpStatus.BAD_REQUEST, "❌ Missing required field: " + field);
             }
         }
-        return null; // No error
+        return null;
     }
 
     private Double parseAmount(Object amountObj) throws NumberFormatException {
         return Double.valueOf(amountObj.toString());
+    }
+
+    private boolean isATMTransaction(Map<String, Object> requestBody) {
+        return requestBody.containsKey("isATM") && Boolean.TRUE.equals(requestBody.get("isATM"));
     }
 
     // ===================== TRANSACTION ENDPOINTS =====================
@@ -269,10 +268,10 @@ public class TransactionController {
         });
     }
 
-    // ===================== TRANSFER ENDPOINTS =====================
+    // ===================== UNIFIED TRANSACTION ENDPOINTS =====================
 
-    @PostMapping("/customer")
-    public ResponseEntity<?> customerTransfer(@RequestBody Map<String, Object> requestBody) {
+    @PostMapping("/transfer")
+    public ResponseEntity<?> transfer(@RequestBody Map<String, Object> requestBody) {
         return withApprovedUser(user -> {
             ResponseEntity<?> validationError = validateTransferRequest(requestBody, "fromIban", "toIban", "amount");
             if (validationError != null) return validationError;
@@ -281,16 +280,20 @@ public class TransactionController {
                 String fromIban = (String) requestBody.get("fromIban");
                 String toIban = (String) requestBody.get("toIban");
                 Double amount = parseAmount(requestBody.get("amount"));
+                boolean isATM = isATMTransaction(requestBody);
 
-                return handleServiceResult(() ->
-                        transactionService.transferFunds(fromIban, toIban, amount, user));
+                if (isATM) {
+                    return handleTransactionResult(() -> transactionService.atmTransfer(fromIban, toIban, amount, user), true);
+                } else {
+                    return handleTransactionResult(() -> transactionService.transferFunds(fromIban, toIban, amount, user), false);
+                }
             } catch (NumberFormatException e) {
                 return createErrorResponse(HttpStatus.BAD_REQUEST, "❌ Invalid amount format");
             }
         });
     }
 
-    @PostMapping("/admin")
+    @PostMapping("/admin/transfer")
     public ResponseEntity<?> adminTransfer(@RequestBody Map<String, Object> requestBody) {
         return withAdminUser(user -> {
             ResponseEntity<?> validationError = validateTransferRequest(requestBody, "fromIban", "toIban", "amount");
@@ -301,8 +304,7 @@ public class TransactionController {
                 String toIban = (String) requestBody.get("toIban");
                 Double amount = parseAmount(requestBody.get("amount"));
 
-                return handleServiceResult(() ->
-                        transactionService.transferFunds(fromIban, toIban, amount, user));
+                return handleTransactionResult(() -> transactionService.transferFunds(fromIban, toIban, amount, user), false);
             } catch (NumberFormatException e) {
                 return createErrorResponse(HttpStatus.BAD_REQUEST, "❌ Invalid amount format");
             }
@@ -310,7 +312,7 @@ public class TransactionController {
     }
 
     @PostMapping("/deposit")
-    public ResponseEntity<?> makeDeposit(@RequestBody Map<String, Object> requestBody) {
+    public ResponseEntity<?> deposit(@RequestBody Map<String, Object> requestBody) {
         return withAuthenticatedUser(user -> {
             ResponseEntity<?> validationError = validateTransferRequest(requestBody, "iban", "amount");
             if (validationError != null) return validationError;
@@ -318,9 +320,13 @@ public class TransactionController {
             try {
                 String iban = (String) requestBody.get("iban");
                 Double amount = parseAmount(requestBody.get("amount"));
+                boolean isATM = isATMTransaction(requestBody);
 
-                return handleServiceResult(() ->
-                        transactionService.deposit(iban, amount, user));
+                if (isATM) {
+                    return handleTransactionResult(() -> transactionService.atmDeposit(iban, amount, user), true);
+                } else {
+                    return handleTransactionResult(() -> transactionService.deposit(iban, amount, user), false);
+                }
             } catch (NumberFormatException e) {
                 return createErrorResponse(HttpStatus.BAD_REQUEST, "❌ Invalid amount format");
             }
@@ -328,7 +334,7 @@ public class TransactionController {
     }
 
     @PostMapping("/withdraw")
-    public ResponseEntity<?> makeWithdrawal(@RequestBody Map<String, Object> requestBody) {
+    public ResponseEntity<?> withdraw(@RequestBody Map<String, Object> requestBody) {
         return withApprovedUser(user -> {
             ResponseEntity<?> validationError = validateTransferRequest(requestBody, "iban", "amount");
             if (validationError != null) return validationError;
@@ -336,9 +342,13 @@ public class TransactionController {
             try {
                 String iban = (String) requestBody.get("iban");
                 Double amount = parseAmount(requestBody.get("amount"));
+                boolean isATM = isATMTransaction(requestBody);
 
-                return handleServiceResult(() ->
-                        transactionService.withdraw(iban, amount, user));
+                if (isATM) {
+                    return handleTransactionResult(() -> transactionService.atmWithdraw(iban, amount, user), true);
+                } else {
+                    return handleTransactionResult(() -> transactionService.withdraw(iban, amount, user), false);
+                }
             } catch (NumberFormatException e) {
                 return createErrorResponse(HttpStatus.BAD_REQUEST, "❌ Invalid amount format");
             }
@@ -356,75 +366,19 @@ public class TransactionController {
                 String toIban = (String) requestBody.get("toIban");
                 Double amount = parseAmount(requestBody.get("amount"));
 
-                return handleServiceResult(() ->
-                        transactionService.internalTransfer(fromIban, toIban, amount, user));
+                return handleTransactionResult(() -> transactionService.internalTransfer(fromIban, toIban, amount, user), false);
             } catch (NumberFormatException e) {
                 return createErrorResponse(HttpStatus.BAD_REQUEST, "❌ Invalid amount format");
             }
         });
     }
 
-    // ===================== ATM ENDPOINTS =====================
-
-    @PostMapping("/atm/withdraw")
-    public ResponseEntity<?> atmWithdraw(@RequestBody Map<String, Object> requestBody) {
-        return withAuthenticatedUser(user -> {
-            ResponseEntity<?> validationError = validateTransferRequest(requestBody, "iban", "amount");
-            if (validationError != null) return validationError;
-
-            try {
-                String iban = (String) requestBody.get("iban");
-                Double amount = parseAmount(requestBody.get("amount"));
-
-                return handleATMResult(() ->
-                        transactionService.atmWithdraw(iban, amount, user));
-            } catch (NumberFormatException e) {
-                return createErrorResponse(HttpStatus.BAD_REQUEST, "❌ Invalid amount format");
-            }
-        });
-    }
-
-    @PostMapping("/atm/deposit")
-    public ResponseEntity<?> atmDeposit(@RequestBody Map<String, Object> requestBody) {
-        return withAuthenticatedUser(user -> {
-            ResponseEntity<?> validationError = validateTransferRequest(requestBody, "iban", "amount");
-            if (validationError != null) return validationError;
-
-            try {
-                String iban = (String) requestBody.get("iban");
-                Double amount = parseAmount(requestBody.get("amount"));
-
-                return handleATMResult(() ->
-                        transactionService.atmDeposit(iban, amount, user));
-            } catch (NumberFormatException e) {
-                return createErrorResponse(HttpStatus.BAD_REQUEST, "❌ Invalid amount format");
-            }
-        });
-    }
-
-    @PostMapping("/atm/transfer")
-    public ResponseEntity<?> atmTransfer(@RequestBody Map<String, Object> requestBody) {
-        return withApprovedUser(user -> {
-            ResponseEntity<?> validationError = validateTransferRequest(requestBody, "fromIban", "toIban", "amount");
-            if (validationError != null) return validationError;
-
-            try {
-                String fromIban = (String) requestBody.get("fromIban");
-                String toIban = (String) requestBody.get("toIban");
-                Double amount = parseAmount(requestBody.get("amount"));
-
-                return handleATMResult(() ->
-                        transactionService.atmTransfer(fromIban, toIban, amount, user));
-            } catch (NumberFormatException e) {
-                return createErrorResponse(HttpStatus.BAD_REQUEST, "❌ Invalid amount format");
-            }
-        });
-    }
+    // ===================== ATM-SPECIFIC ENDPOINTS =====================
 
     @GetMapping("/atm/account-summary/{iban}")
     public ResponseEntity<?> getAccountSummary(@PathVariable String iban) {
         return withAuthenticatedUser(user ->
-                handleATMResult(() -> transactionService.getAccountSummary(iban, user))
+                handleTransactionResult(() -> transactionService.getAccountSummary(iban, user), true)
         );
     }
 
