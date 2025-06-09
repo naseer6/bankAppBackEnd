@@ -27,7 +27,7 @@ class ATMServiceTest {
     private TransactionRepository transactionRepository;
 
     @Mock
-    private TransferService transferService;
+    private TransactionService transactionService;
 
     @InjectMocks
     private ATMService atmService;
@@ -55,8 +55,8 @@ class ATMServiceTest {
         tx.setAmount(100.0); // ✅ Fix: set amount to prevent NullPointerException
 
         when(bankAccountRepository.findByIban(account.getIban())).thenReturn(Optional.of(account));
-        when(transferService.withdraw(account.getIban(), 100.0, user))
-                .thenReturn(new TransferService.TransferResult(true, "✅ OK", tx));
+        when(transactionService.withdraw(account.getIban(), 100.0, user))
+                .thenReturn(new TransactionService.TransferResult(true, "✅ OK", tx));
 
         ATMService.ATMResult result = atmService.atmWithdraw(account.getIban(), 100.0, user);
 
@@ -91,8 +91,8 @@ class ATMServiceTest {
         Transaction tx = new Transaction();
 
         when(bankAccountRepository.findByIban(account.getIban())).thenReturn(Optional.of(account));
-        when(transferService.deposit(account.getIban(), 500.0, user))
-                .thenReturn(new TransferService.TransferResult(true, "✅ Deposit OK", tx));
+        when(transactionService.deposit(account.getIban(), 500.0, user))
+                .thenReturn(new TransactionService.TransferResult(true, "✅ Deposit OK", tx));
 
         ATMService.ATMResult result = atmService.atmDeposit(account.getIban(), 500.0, user);
 
@@ -113,8 +113,8 @@ class ATMServiceTest {
         Transaction tx = new Transaction();
 
         when(bankAccountRepository.findByIban(account.getIban())).thenReturn(Optional.of(account));
-        when(transferService.transferFunds(account.getIban(), toIban, 300.0, user))
-                .thenReturn(new TransferService.TransferResult(true, "✅ Transfer OK", tx));
+        when(transactionService.transferFunds(account.getIban(), toIban, 300.0, user))
+                .thenReturn(new TransactionService.TransferResult(true, "✅ Transfer OK", tx));
 
         ATMService.ATMResult result = atmService.atmTransfer(account.getIban(), toIban, 300.0, user);
 

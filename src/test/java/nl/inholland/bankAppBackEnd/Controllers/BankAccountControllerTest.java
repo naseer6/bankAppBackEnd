@@ -8,9 +8,8 @@ import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.repository.BankAccountRepository;
 import nl.inholland.bankAppBackEnd.repository.UserRepository;
 import nl.inholland.bankAppBackEnd.services.BankAccountService;
-import nl.inholland.bankAppBackEnd.services.TransferService;
+import nl.inholland.bankAppBackEnd.services.TransactionService;
 import nl.inholland.bankAppBackEnd.services.UserService;
-import nl.inholland.bankAppBackEnd.services.TransferService;
 import nl.inholland.bankAppBackEnd.models.Transaction;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -38,9 +37,6 @@ class BankAccountControllerTest {
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @MockBean
-    private TransferService transferService;
-
-    @MockBean
     private UserService userService;
 
     @Autowired
@@ -49,7 +45,8 @@ class BankAccountControllerTest {
     @MockBean
     private BankAccountService bankAccountService;
 
-
+    @MockBean
+    private TransactionService transactionService;
 
     @MockBean
     private UserRepository userRepository;
@@ -107,10 +104,10 @@ class BankAccountControllerTest {
         Transaction mockTransaction = new Transaction(); // mock transaction object
         mockTransaction.setAmount(amount);
 
-        TransferService.TransferResult mockResult = new TransferService.TransferResult(true, "✅ Transfer successful", mockTransaction);
+        TransactionService.TransferResult mockResult = new TransactionService.TransferResult(true, "✅ Transfer successful", mockTransaction);
 
         when(userService.getUserByUsername("admin")).thenReturn(Optional.of(mockUser));
-        when(transferService.transferFunds(fromIban, toIban, amount, mockUser)).thenReturn(mockResult);
+        when(transactionService.transferFunds(fromIban, toIban, amount, mockUser)).thenReturn(mockResult);
 
         // Act & Assert
         mockMvc.perform(post("/api/accounts/transfer")
@@ -132,10 +129,10 @@ class BankAccountControllerTest {
         Transaction mockTransaction = new Transaction();
         mockTransaction.setAmount(amount);
 
-        TransferService.TransferResult mockResult = new TransferService.TransferResult(true, "✅ Deposit successful", mockTransaction);
+        TransactionService.TransferResult mockResult = new TransactionService.TransferResult(true, "✅ Deposit successful", mockTransaction);
 
         when(userService.getUserByUsername("admin")).thenReturn(Optional.of(mockUser));
-        when(transferService.deposit(iban, amount, mockUser)).thenReturn(mockResult);
+        when(transactionService.deposit(iban, amount, mockUser)).thenReturn(mockResult);
 
         // Act & Assert
         mockMvc.perform(post("/api/accounts/deposit")
@@ -153,8 +150,8 @@ class BankAccountControllerTest {
 
         when(userService.getUserByUsername(any())).thenReturn(Optional.of(mockUser));
 
-        TransferService.TransferResult failedResult = new TransferService.TransferResult(false, "Insufficient funds", null);
-        when(transferService.withdraw(anyString(), anyDouble(), any())).thenReturn(failedResult);
+        TransactionService.TransferResult failedResult = new TransactionService.TransferResult(false, "Insufficient funds", null);
+        when(transactionService.withdraw(anyString(), anyDouble(), any())).thenReturn(failedResult);
 
         // Act & Assert
         mockMvc.perform(post("/api/accounts/withdraw")
@@ -176,8 +173,8 @@ class BankAccountControllerTest {
 
         when(userService.getUserByUsername(any())).thenReturn(Optional.of(adminUser));
 
-        TransferService.TransferResult successResult = new TransferService.TransferResult(true, "Limits updated successfully", null);
-        when(transferService.updateAccountLimits(anyString(), any(), any(), any())).thenReturn(successResult);
+        TransactionService.TransferResult successResult = new TransactionService.TransferResult(true, "Limits updated successfully", null);
+        when(transactionService.updateAccountLimits(anyString(), any(), any(), any())).thenReturn(successResult);
 
         // Act & Assert
         mockMvc.perform(post("/api/accounts/update-limits")
