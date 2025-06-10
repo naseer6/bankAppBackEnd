@@ -29,6 +29,11 @@ public class UserService implements UserDetailsService {
         return userRepository.save(user);
     }
 
+    // Add updateUser method that was missing
+    public User updateUser(User user) {
+        return userRepository.save(user);
+    }
+
     public boolean emailExists(String email) {
         return userRepository.findByEmail(email).isPresent();
     }
