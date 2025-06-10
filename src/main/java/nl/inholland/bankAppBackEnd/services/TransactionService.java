@@ -753,7 +753,7 @@ public class TransactionService {
         bankAccountRepository.save(account);
 
         // Create transaction record with ATM_DEPOSIT type directly
-        Transaction transaction = createTransactionRecord(null, account, amount, "ATM_DEPOSIT", user);
+        Transaction transaction = createTransactionRecord(null, account, amount, "DEPOSIT", user);
 
         return new ATMResult(true,
                 String.format("✅ Successfully deposited €%.2f at ATM. New balance: €%.2f",

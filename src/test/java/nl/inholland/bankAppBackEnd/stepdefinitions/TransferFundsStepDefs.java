@@ -1,4 +1,4 @@
 package nl.inholland.bankAppBackEnd.stepdefinitions;
 
-public class TransferFundsExternallyStepDefs {
+public class TransferFundsStepDefs {
 }
