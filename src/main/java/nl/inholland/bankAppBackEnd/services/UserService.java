@@ -57,4 +57,7 @@ public class UserService implements UserDetailsService {
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole()))
         );
     }
+    public void deleteUserByUsername(String username) {
+        userRepository.findByUsername(username).ifPresent(userRepository::delete);
+    }
 }
