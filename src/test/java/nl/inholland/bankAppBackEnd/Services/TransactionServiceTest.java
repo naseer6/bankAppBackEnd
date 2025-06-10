@@ -40,15 +40,18 @@ class TransactionServiceTest {
     private BankAccount mockAccount;
     private Transaction mockTransaction;
 
+
+    // Also ensure mockUser is properly configured in setUp method
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
 
-        // Setup mock user
+        // Setup mock user with proper configuration
         mockUser = new User();
         mockUser.setId(1L);
         mockUser.setUsername("testuser");
         mockUser.setRole(User.Role.USER);
+        mockUser.setApproved(true); // ✅ Ensure user is approved
 
         // Setup mock bank account
         mockAccount = new BankAccount();
@@ -56,6 +59,10 @@ class TransactionServiceTest {
         mockAccount.setIban("NL01INHO0000000001");
         mockAccount.setOwner(mockUser);
         mockAccount.setBalance(1000.0);
+        mockAccount.setType(BankAccount.AccountType.CHECKING); // ✅ Set account type
+        mockAccount.setAbsoluteLimit(0.0); // ✅ Set limits
+        mockAccount.setDailyLimit(1000.0);
+        mockAccount.setDailySpent(0.0);
 
         // Setup mock transaction
         mockTransaction = new Transaction();
@@ -119,21 +126,37 @@ class TransactionServiceTest {
 
     @Test
     void transferFunds_Success() {
+        // Setup fromAccount with proper configuration
         BankAccount fromAccount = new BankAccount();
+        fromAccount.setId(1L); // ✅ Fix: Set ID for same account check
         fromAccount.setIban("NL01INHO0000000001");
         fromAccount.setBalance(1000.0);
+        fromAccount.setType(BankAccount.AccountType.CHECKING); // ✅ Fix: Set account type to CHECKING
+        fromAccount.setOwner(mockUser); // ✅ Fix: Set owner for permission check
+        fromAccount.setAbsoluteLimit(0.0); // ✅ Fix: Set absolute limit
+        fromAccount.setDailyLimit(1000.0); // ✅ Fix: Set daily limit
+        fromAccount.setDailySpent(0.0); // ✅ Fix: Set daily spent amount
 
+        // Setup toAccount with proper configuration
         BankAccount toAccount = new BankAccount();
+        toAccount.setId(2L); // ✅ Fix: Set different ID
         toAccount.setIban("NL01INHO0000000002");
         toAccount.setBalance(500.0);
+        // Create a different user for toAccount owner
+        User toAccountOwner = new User();
+        toAccountOwner.setId(2L);
+        toAccount.setOwner(toAccountOwner); // ✅ Fix: Set an owner (different user)
 
+        // Mock repository calls
         when(bankAccountRepository.findByIban("NL01INHO0000000001")).thenReturn(Optional.of(fromAccount));
         when(bankAccountRepository.findByIban("NL01INHO0000000002")).thenReturn(Optional.of(toAccount));
         when(transactionRepository.save(any(Transaction.class))).thenReturn(mockTransaction);
 
+        // Execute the transfer
         TransactionService.TransferResult result = transactionService.transferFunds(
                 "NL01INHO0000000001", "NL01INHO0000000002", 100.0, mockUser);
 
+        // Assertions
         assertTrue(result.isSuccess());
         assertEquals("✅ Successfully transferred €100.00 from NL01INHO0000000001 to NL01INHO0000000002", result.getMessage());
         assertEquals(900.0, fromAccount.getBalance());
