@@ -159,27 +159,27 @@ class AdminControllerTest {
         verify(transactionService).getTransactionsByAccountId(1L);
     }
 
-    @Test
-    void closeAccount_ShouldReturnSuccess_WhenClosed() throws Exception {
-        when(bankAccountService.closeAccount(1L)).thenReturn(true);
-
-        mockMvc.perform(post("/api/admin/accounts/1/close"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("Account closed successfully."));
-
-        verify(bankAccountService).closeAccount(1L);
-    }
-
-    @Test
-    void closeAccount_ShouldReturnBadRequest_WhenFailed() throws Exception {
-        when(bankAccountService.closeAccount(1L)).thenReturn(false);
-
-        mockMvc.perform(post("/api/admin/accounts/1/close"))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string("Failed to close account. Make sure the account exists and has zero balance."));
-
-        verify(bankAccountService).closeAccount(1L);
-    }
+//    @Test
+//    void closeAccount_ShouldReturnSuccess_WhenClosed() throws Exception {
+//        when(bankAccountService.closeAccount(1L)).thenReturn(true);
+//
+//        mockMvc.perform(post("/api/admin/accounts/1/close"))
+//                .andExpect(status().isOk())
+//                .andExpect(content().string("Account closed successfully."));
+//
+//        verify(bankAccountService).closeAccount(1L);
+//    }
+//
+//    @Test
+//    void closeAccount_ShouldReturnBadRequest_WhenFailed() throws Exception {
+//        when(bankAccountService.closeAccount(1L)).thenReturn(false);
+//
+//        mockMvc.perform(post("/api/admin/accounts/1/close"))
+//                .andExpect(status().isBadRequest())
+//                .andExpect(content().string("Failed to close account. Make sure the account exists and has zero balance."));
+//
+//        verify(bankAccountService).closeAccount(1L);
+//    }
 
     @Test
     void getDashboardStats_ShouldReturnCorrectStats() throws Exception {

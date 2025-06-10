@@ -2,6 +2,8 @@ package nl.inholland.bankAppBackEnd.services;
 
 import jakarta.transaction.Transactional;
 import nl.inholland.bankAppBackEnd.DTOs.AccountSearchResultDTO;
+import nl.inholland.bankAppBackEnd.DTOs.BankAccountDTO;
+import nl.inholland.bankAppBackEnd.DTOs.DashboardStatsDTO;
 import nl.inholland.bankAppBackEnd.exceptions.ResourceNotFoundException;
 import nl.inholland.bankAppBackEnd.models.BankAccount;
 import nl.inholland.bankAppBackEnd.models.User;
@@ -21,6 +23,20 @@ public class BankAccountService {
     private BankAccountRepository bankAccountRepository;
     @Autowired
     private UserRepository userRepository;
+
+
+
+    private final TransactionService transactionService;
+
+    @Autowired
+    public BankAccountService(
+            BankAccountRepository bankAccountRepository,
+            UserRepository userRepository,
+            TransactionService transactionService) { // Update constructor
+        this.bankAccountRepository = bankAccountRepository;
+        this.userRepository = userRepository;
+        this.transactionService = transactionService; // Inject TransactionService
+    }
 
     public BankAccount createAccountForUser(User user) {
         BankAccount account = new BankAccount();
@@ -89,22 +105,7 @@ public class BankAccountService {
         return bankAccountRepository.findById(accountId);
     }
 
-    @Transactional
-    public boolean closeAccount(Long accountId) {
-        Optional<BankAccount> accountOpt = bankAccountRepository.findById(accountId);
 
-        if (accountOpt.isPresent()) {
-            BankAccount account = accountOpt.get();
-
-            // Check if the account has zero balance
-            if (account.getBalance() == 0.0) {
-                account.setActive(false);
-                bankAccountRepository.save(account);
-                return true;
-            }
-        }
-        return false;
-    }
 
     public int getActiveAccountsCount() {
         return (int) bankAccountRepository.findAll()
@@ -133,6 +134,8 @@ public class BankAccountService {
 
         return limits;
     }
+
+
 
 
     /**
@@ -171,5 +174,63 @@ public class BankAccountService {
 
         return results;
     }
+
+    /**
+     * Get all accounts as DTOs
+     */
+    public List<BankAccountDTO> getAllAccountDTOs() {
+        return getAllAccounts().stream()
+                .map(BankAccountDTO::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get account DTO by ID
+     */
+    public Optional<BankAccountDTO> getAccountDTOById(Long accountId) {
+        return getAccountById(accountId).map(BankAccountDTO::fromEntity);
+    }
+
+    /**
+     * Check if account exists
+     */
+    public boolean accountExists(Long accountId) {
+        return bankAccountRepository.existsById(accountId);
+    }
+
+    /**
+     * Close an account with better error handling
+     */
+    @Transactional
+    public void closeAccount(Long accountId) {
+        BankAccount account = bankAccountRepository.findById(accountId)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found with ID: " + accountId));
+
+        // Check if the account has zero balance
+        if (account.getBalance() != 0.0) {
+            throw new IllegalStateException("Cannot close account with non-zero balance");
+        }
+
+        account.setActive(false);
+        bankAccountRepository.save(account);
+    }
+
+    /**
+     * Get dashboard statistics
+     */
+    public DashboardStatsDTO getDashboardStats() {
+        int pendingApprovals = (int) userRepository.findAll()
+                .stream()
+                .filter(user -> !user.isApproved() && user.getRole() == User.Role.USER)
+                .count();
+
+        int totalUsers = (int) userRepository.count();
+        int activeAccounts = getActiveAccountsCount();
+        // Call the method on the instance, not statically
+        int todayTransactions = transactionService.getTodayTransactionsCount();
+
+        return new DashboardStatsDTO(pendingApprovals, totalUsers, activeAccounts, todayTransactions);
+    }
 }
+
 

@@ -23,11 +23,15 @@ import java.util.stream.Collectors;
 @Service
 public class TransactionService {
 
-    @Autowired
-    private TransactionRepository transactionRepository;
+    private final TransactionRepository transactionRepository;
+    private final BankAccountRepository bankAccountRepository;
 
     @Autowired
-    private BankAccountRepository bankAccountRepository;
+    public TransactionService(TransactionRepository transactionRepository,
+                              BankAccountRepository bankAccountRepository) {
+        this.transactionRepository = transactionRepository;
+        this.bankAccountRepository = bankAccountRepository;
+    }
 
     // Basic CRUD operations
     public Transaction save(Transaction transaction) {
@@ -56,7 +60,7 @@ public class TransactionService {
         if (tx.getFromAccount() == null && tx.getToAccount() != null && userIbans.contains(tx.getToAccount().getIban())) {
             return "Incoming";
         }
-        
+
         // Handle withdrawal cases - toAccount is null
         if (tx.getToAccount() == null && tx.getFromAccount() != null && userIbans.contains(tx.getFromAccount().getIban())) {
             return "Outgoing";
@@ -83,7 +87,7 @@ public class TransactionService {
 
         dto.setId(transaction.getId());
         dto.setAmount(transaction.getAmount());
-        
+
         // Simplify ATM transaction types for user display
         String description = transaction.getTransactionType();
         if (description.equals("WITHDRAWAL")) {
@@ -124,7 +128,7 @@ public class TransactionService {
 
         dto.setId(transaction.getId());
         dto.setAmount(transaction.getAmount());
-        
+
         // Simplify ATM transaction types for admin display
         String description = transaction.getTransactionType();
         if (description.equals("WITHDRAWAL")) {
@@ -135,7 +139,7 @@ public class TransactionService {
             description = "Transfer";
         }
         dto.setDescription(description);
-        
+
         dto.setFromIban(transaction.getFromAccount() != null ? transaction.getFromAccount().getIban() : null);
         dto.setToIban(transaction.getToAccount() != null ? transaction.getToAccount().getIban() : null);
         dto.setDate(transaction.getTimestamp() != null ?
@@ -154,9 +158,9 @@ public class TransactionService {
         } else {
             direction = "Unknown";
         }
-        
+
         dto.setDirection(direction);
-        
+
         // For admin, show actual amount (positive for deposits, negative for withdrawals)
         if (direction.equals("Withdrawal")) {
             dto.setSignedAmount(-transaction.getAmount());
@@ -239,7 +243,6 @@ public class TransactionService {
             transactionDTOs.add(convertToDTO(tx, userIbans));
         }
 
-
         return new PageImpl<>(transactionDTOs, pageable, transactionsPage.getTotalElements());
     }
 
@@ -252,15 +255,14 @@ public class TransactionService {
             dtos.add(convertToDTO(tx, userIbans));
         }
         return dtos;
-
     }
 
     // Helper method to get user's IBANs
     public List<String> getUserIbans(User user) {
         List<BankAccount> userAccounts = bankAccountRepository.findAllByOwner(user);
         return userAccounts.stream()
-            .map(BankAccount::getIban)
-            .collect(Collectors.toList());
+                .map(BankAccount::getIban)
+                .collect(Collectors.toList());
     }
 
     // Admin filtered transactions with pagination
@@ -293,22 +295,22 @@ public class TransactionService {
 
     // Legacy methods maintained for backward compatibility
     public List<Transaction> getFilteredTransactionsByUser(User user, String iban, String ibanType,
-                                                          Double amount, String comparator,
-                                                          String start, String end) {
+                                                           Double amount, String comparator,
+                                                           String start, String end) {
         // Use paginated version but get all results
         return getFilteredTransactions(iban, ibanType, amount, comparator, start, end, null, Pageable.unpaged())
                 .getContent();
     }
 
     public List<Transaction> getFilteredTransactions(String iban, String ibanType, Double amount,
-                                                    String comparator, String start, String end) {
+                                                     String comparator, String start, String end) {
         return getFilteredTransactions(iban, ibanType, amount, comparator, start, end, null, Pageable.unpaged())
                 .getContent();
     }
 
     public List<Transaction> getFilteredTransactions(String iban, String ibanType, Double amount,
-                                                    String comparator, String start, String end,
-                                                    String initiatedBy) {
+                                                     String comparator, String start, String end,
+                                                     String initiatedBy) {
         return getFilteredTransactions(iban, ibanType, amount, comparator, start, end, initiatedBy, Pageable.unpaged())
                 .getContent();
     }
@@ -348,7 +350,7 @@ public class TransactionService {
 
         public TransferResult(boolean success, String message) {
             this.success = success;
-            this.message = null;
+            this.message = message;
             this.transaction = null;
         }
 
@@ -365,20 +367,20 @@ public class TransactionService {
         if (account == null) {
             return new TransferResult(false, "❌ Account not found");
         }
-        
+
         // Regular users can only access their own accounts
         if (user.getRole() == User.Role.USER && !account.getOwner().getId().equals(user.getId())) {
             return new TransferResult(false, "❌ You can only " + action + " your own accounts");
         }
-        
+
         return new TransferResult(true, "Access validated");
     }
 
     /**
      * Create and save a transaction record
      */
-    private Transaction createTransactionRecord(BankAccount fromAccount, BankAccount toAccount, 
-                                               Double amount, String transactionType, User initiatedBy) {
+    private Transaction createTransactionRecord(BankAccount fromAccount, BankAccount toAccount,
+                                                Double amount, String transactionType, User initiatedBy) {
         Transaction transaction = new Transaction();
         transaction.setFromAccount(fromAccount);
         transaction.setToAccount(toAccount);
@@ -386,7 +388,7 @@ public class TransactionService {
         transaction.setTransactionType(transactionType);
         transaction.setTimestamp(LocalDateTime.now());
         transaction.setInitiatedByUser(initiatedBy);
-        
+
         return transactionRepository.save(transaction);
     }
 
@@ -644,8 +646,6 @@ public class TransactionService {
                 String.format("✅ Successfully updated limits for account %s. Absolute limit: €%.2f, Daily limit: €%.2f",
                         iban, account.getAbsoluteLimit(), account.getDailyLimit()));
     }
-    //atm
-
 
     // --- ATM SERVICE FUNCTIONALITY ---
 
@@ -797,16 +797,16 @@ public class TransactionService {
         if (result.isSuccess()) {
             // Get the transaction created by the transfer method
             Transaction transaction = result.getTransaction();
-            
+
             // Update the transaction type to ATM_TRANSFER
             if (transaction != null) {
                 transaction.setTransactionType("TRANSFER");
                 transaction = transactionRepository.save(transaction);
             }
-            
+
             // Refresh account data
             fromAccount = bankAccountRepository.findByIban(fromIban).get();
-            
+
             return new ATMResult(true, result.getMessage(), fromAccount, transaction);
         } else {
             return new ATMResult(false, result.getMessage());
@@ -867,5 +867,13 @@ public class TransactionService {
         }
     }
 
-
+    /**
+     * Get transaction DTOs for an account
+     */
+    public List<TransactionDTO> getTransactionDTOsByAccountId(Long accountId) {
+        List<Transaction> transactions = getTransactionsByAccountId(accountId);
+        return transactions.stream()
+                .map(this::convertToAdminDTO)
+                .collect(Collectors.toList());
+    }
 }

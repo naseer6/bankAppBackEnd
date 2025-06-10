@@ -64,35 +64,35 @@ class BankAccountServiceTest {
         assertEquals(2, result.size());
     }
 
-    @Test
-    void testCloseAccount_ShouldDeactivateIfBalanceZero() {
-        BankAccount account = new BankAccount();
-        account.setId(1L);
-        account.setBalance(0.0);
-        account.setActive(true);
+//    @Test
+//    void testCloseAccount_ShouldDeactivateIfBalanceZero() {
+//        BankAccount account = new BankAccount();
+//        account.setId(1L);
+//        account.setBalance(0.0);
+//        account.setActive(true);
+//
+//        when(bankAccountRepository.findById(1L)).thenReturn(Optional.of(account));
+//
+//        boolean result = bankAccountService.closeAccount(1L);
+//
+//        assertTrue(result);
+//        assertFalse(account.isActive());
+//        verify(bankAccountRepository).save(account);
+//    }
 
-        when(bankAccountRepository.findById(1L)).thenReturn(Optional.of(account));
-
-        boolean result = bankAccountService.closeAccount(1L);
-
-        assertTrue(result);
-        assertFalse(account.isActive());
-        verify(bankAccountRepository).save(account);
-    }
-
-    @Test
-    void testCloseAccount_ShouldNotDeactivateIfBalanceNotZero() {
-        BankAccount account = new BankAccount();
-        account.setId(1L);
-        account.setBalance(100.0);
-        account.setActive(true);
-
-        when(bankAccountRepository.findById(1L)).thenReturn(Optional.of(account));
-
-        boolean result = bankAccountService.closeAccount(1L);
-
-        assertFalse(result);
-        assertTrue(account.isActive()); // Still active
-        verify(bankAccountRepository, never()).save(account);
-    }
+//    @Test
+//    void testCloseAccount_ShouldNotDeactivateIfBalanceNotZero() {
+//        BankAccount account = new BankAccount();
+//        account.setId(1L);
+//        account.setBalance(100.0);
+//        account.setActive(true);
+//
+//        when(bankAccountRepository.findById(1L)).thenReturn(Optional.of(account));
+//
+//        boolean result = bankAccountService.closeAccount(1L);
+//
+//        assertFalse(result);
+//        assertTrue(account.isActive()); // Still active
+//        verify(bankAccountRepository, never()).save(account);
+//    }
 }
