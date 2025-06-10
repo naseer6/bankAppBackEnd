@@ -15,8 +15,8 @@ public class LoginStepDefs {
     @Autowired
     private UserService userService;
 
-    private String testUsername = "cucumberuser";
-    private String testPassword = "cucumberpass";
+    private String testUsername = "testuser";
+    private String testPassword = "testpass";
     private UserDetails loggedInUser;
     private Exception loginException;
 
@@ -25,15 +25,15 @@ public class LoginStepDefs {
         // Ensure test user exists in DB
         if (userService.getUserByUsername(testUsername).isEmpty()) {
             User user = new User();
-            user.setName("Cucumber User");
+            user.setName("Test User");
             user.setUsername(testUsername);
-            user.setEmail("cucumber@example.com");
+            user.setEmail("testuser@example.com");
             user.setPassword(testPassword);
-            user.setPhone("0987654321");
-            user.setAddress("Cucumber Street 123");
+            user.setPhone("1234567890");
+            user.setAddress("Test Address");
             user.setRole(User.Role.USER);
             user.setApproved(true);
-            user.setBsnNumber("987654321");
+            user.setBsnNumber("123456789");
             userService.register(user);
         }
     }
