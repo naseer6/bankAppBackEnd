@@ -1,11 +1,7 @@
 FROM ubuntu:latest AS build
-
-RUN apt-get update && apt-get install -y openjdk-21-jdk maven
-
+RUN apt-get update
+RUN apt-get install openjdk-19-jdk -y
 COPY . .
-
-RUN mvn clean install -U
-
+RUN ./mvnw clean install -U
 EXPOSE 8080
-
-ENTRYPOINT ["java","-jar","target/your-app.jar"]
+ENTRYPOINT ["./mvnw","spring-boot:run"]
