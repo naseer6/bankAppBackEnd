@@ -1,5 +1,7 @@
 package nl.inholland.bankAppBackEnd.Controllers;
 
+import nl.inholland.bankAppBackEnd.DTOs.AccountSearchResultDTO;
+import nl.inholland.bankAppBackEnd.exceptions.ResourceNotFoundException;
 import nl.inholland.bankAppBackEnd.models.BankAccount;
 import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.repository.BankAccountRepository;
@@ -230,34 +232,14 @@ public class BankAccountController {
 
     @GetMapping("/find-by-name")
     public ResponseEntity<?> findAccountsByOwnerName(@RequestParam String name) {
-        if (name == null || name.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("❌ Name parameter cannot be empty");
+        try {
+            List<AccountSearchResultDTO> results = bankAccountService.findAccountsByOwnerName(name);
+            return ResponseEntity.ok(results);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body("❌ " + e.getMessage());
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ " + e.getMessage());
         }
-
-        List<User> matchingUsers = userRepository.findByNameContainingIgnoreCase(name);
-
-        if (matchingUsers.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ No users found with name: " + name);
-        }
-
-        List<Map<String, Object>> results = new ArrayList<>();
-        for (User user : matchingUsers) {
-            List<BankAccount> userAccounts = bankAccountRepository.findAllByOwner(user);
-
-            for (BankAccount account : userAccounts) {
-                Map<String, Object> accountDetails = new HashMap<>();
-                accountDetails.put("ownerName", user.getName());
-                accountDetails.put("iban", account.getIban());
-                accountDetails.put("accountType", account.getType().toString());
-                results.add(accountDetails);
-            }
-        }
-
-        if (results.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ No accounts found for users with name: " + name);
-        }
-
-        return ResponseEntity.ok(results);
     }
 
     @GetMapping("/search-iban")

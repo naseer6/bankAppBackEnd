@@ -1,20 +1,26 @@
 package nl.inholland.bankAppBackEnd.services;
 
 import jakarta.transaction.Transactional;
+import nl.inholland.bankAppBackEnd.DTOs.AccountSearchResultDTO;
+import nl.inholland.bankAppBackEnd.exceptions.ResourceNotFoundException;
 import nl.inholland.bankAppBackEnd.models.BankAccount;
 import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.repository.BankAccountRepository;
+import nl.inholland.bankAppBackEnd.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class BankAccountService {
 
     @Autowired
     private BankAccountRepository bankAccountRepository;
+    @Autowired
+    private UserRepository userRepository;
 
     public BankAccount createAccountForUser(User user) {
         BankAccount account = new BankAccount();
@@ -128,4 +134,42 @@ public class BankAccountService {
         return limits;
     }
 
+
+    /**
+     * Find accounts by owner name (case-insensitive partial match)
+     *
+     * @param name The name to search for
+     * @return List of accounts matching the search criteria
+     * @throws IllegalArgumentException if name is null or empty
+     * @throws ResourceNotFoundException if no users or accounts found
+     */
+    public List<AccountSearchResultDTO> findAccountsByOwnerName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Name parameter cannot be empty");
+        }
+
+        // Get users matching the name
+        List<User> matchingUsers = userRepository.findByNameContainingIgnoreCase(name);
+
+        if (matchingUsers.isEmpty()) {
+            throw new ResourceNotFoundException("No users found with name: " + name);
+        }
+
+        // Use Java 8 streams to efficiently process the data
+        List<AccountSearchResultDTO> results = matchingUsers.stream()
+                .flatMap(user -> bankAccountRepository.findAllByOwner(user).stream()
+                        .map(account -> new AccountSearchResultDTO(
+                                user.getName(),
+                                account.getIban(),
+                                account.getType().toString()
+                        )))
+                .collect(Collectors.toList());
+
+        if (results.isEmpty()) {
+            throw new ResourceNotFoundException("No accounts found for users with name: " + name);
+        }
+
+        return results;
+    }
 }
+
