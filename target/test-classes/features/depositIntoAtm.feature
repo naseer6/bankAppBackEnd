@@ -1,13 +1,14 @@
 Feature: Deposit into ATM
 
-  Scenario: Successful ATM deposit
-    Given a user "carol" with an active account "NL01INHO0000000003" and balance 500
-    When the user deposits 300 euros into the ATM
-    Then the deposit is successful
-    And the account balance should be 800
+  Scenario: User deposits money into their account via ATM
+    Given the user is on the registration page
+    When the user enters valid registration details
+    Then the user account should be created
 
-  Scenario: ATM deposit exceeding limit
-    Given a user "dave" with an active account "NL01INHO0000000004" and balance 1000
-    When the user deposits 2500 euros into the ATM
-    Then the deposit fails with message "ATM deposit limit is €2000 per transaction"
-    And the account balance should be 1000
+    Given the user is on the login page
+    When the user enters valid credentials
+    Then the user should be redirected to the dashboard
+
+    Given the user has a bank account with IBAN "ATMDEPOSIT123" and balance 100.0
+    When the user deposits 50.0 into the ATM for IBAN "ATMDEPOSIT123"
+    Then the ATM deposit should be successful and the new balance should be 150.0

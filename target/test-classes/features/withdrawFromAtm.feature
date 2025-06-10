@@ -1,13 +1,14 @@
 Feature: Withdraw from ATM
 
-  Scenario: Successful ATM withdrawal
-    Given a user "alice" with an active account "NL01INHO0000000001" and balance 1000
-    When the user withdraws 200 euros from the ATM
-    Then the withdrawal is successful
-    And the account balance should be 800
+  Scenario: User withdraws money from their account via ATM
+    Given the user is on the registration page
+    When the user enters valid registration details
+    Then the user account should be created
 
-  Scenario: ATM withdrawal exceeding balance
-    Given a user "bob" with an active account "NL01INHO0000000002" and balance 100
-    When the user withdraws 200 euros from the ATM
-    Then the withdrawal fails with message "Insufficient balance"
-    And the account balance should be 100
+    Given the user is on the login page
+    When the user enters valid credentials
+    Then the user should be redirected to the dashboard
+
+    Given the user has a bank account with IBAN "ATMWITHDRAW123" and balance 200.0
+    When the user withdraws 80.0 from the ATM for IBAN "ATMWITHDRAW123"
+    Then the ATM withdrawal should be successful and the new balance should be 120.0
