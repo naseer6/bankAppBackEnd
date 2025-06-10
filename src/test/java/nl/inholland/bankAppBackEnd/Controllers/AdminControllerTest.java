@@ -18,7 +18,8 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -26,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = AdminController.class, excludeAutoConfiguration = SecurityAutoConfiguration.class)
 class AdminControllerTest {
+
     @MockBean
     private JwtUtil jwtUtil;
 
@@ -55,6 +57,11 @@ class AdminControllerTest {
         user.setApproved(false);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        doAnswer(invocation -> {
+            User savedUser = invocation.getArgument(0);
+            savedUser.setApproved(true);
+            return savedUser;
+        }).when(userRepository).save(any(User.class));
 
         mockMvc.perform(post("/api/admin/approve/1"))
                 .andExpect(status().isOk())
@@ -89,15 +96,17 @@ class AdminControllerTest {
 
     @Test
     void getUnapprovedUsers_ShouldReturnList() throws Exception {
-        User user1 = new User(); user1.setApproved(false); user1.setRole(User.Role.USER);
-        User user2 = new User(); user2.setApproved(false); user2.setRole(User.Role.USER);
-        User admin = new User(); admin.setApproved(false); admin.setRole(User.Role.ADMIN);
+        User user1 = new User(); user1.setId(1L); user1.setApproved(false); user1.setRole(User.Role.USER);
+        User user2 = new User(); user2.setId(2L); user2.setApproved(false); user2.setRole(User.Role.USER);
+        User admin = new User(); admin.setId(3L); admin.setApproved(false); admin.setRole(User.Role.ADMIN);
 
         when(userRepository.findAll()).thenReturn(List.of(user1, user2, admin));
 
         mockMvc.perform(get("/api/admin/unapproved-users"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[1].id").value(2));
     }
 
     @Test
@@ -118,6 +127,8 @@ class AdminControllerTest {
         mockMvc.perform(get("/api/admin/accounts/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1));
+
+        verify(bankAccountService).getAccountById(1L);
     }
 
     @Test
@@ -135,13 +146,17 @@ class AdminControllerTest {
         account.setId(1L);
         when(bankAccountService.getAccountById(1L)).thenReturn(Optional.of(account));
 
-        Transaction tx1 = new Transaction();
-        Transaction tx2 = new Transaction();
+        Transaction tx1 = new Transaction(); tx1.setId(1L);
+        Transaction tx2 = new Transaction(); tx2.setId(2L);
         when(transactionService.getTransactionsByAccountId(1L)).thenReturn(List.of(tx1, tx2));
 
         mockMvc.perform(get("/api/admin/accounts/1/transactions"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[1].id").value(2));
+
+        verify(transactionService).getTransactionsByAccountId(1L);
     }
 
     @Test
@@ -151,6 +166,8 @@ class AdminControllerTest {
         mockMvc.perform(post("/api/admin/accounts/1/close"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("Account closed successfully."));
+
+        verify(bankAccountService).closeAccount(1L);
     }
 
     @Test
@@ -160,6 +177,8 @@ class AdminControllerTest {
         mockMvc.perform(post("/api/admin/accounts/1/close"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Failed to close account. Make sure the account exists and has zero balance."));
+
+        verify(bankAccountService).closeAccount(1L);
     }
 
     @Test
