@@ -30,6 +30,6 @@ public class OpenApiConfig {
                         .version("1.0.0")
                         .contact(new Contact()
                                 .name("Sigma Banking App")
-                                .url("https://github.com/naseer6/bankAppBackEnd")));
+                                .url("https://sigmabankappbackend.onrender.com")));
     }
 }
