@@ -162,6 +162,11 @@ public class BankAccountController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Not authenticated");
         }
 
+        // Only admins can update limits
+        if (currentUser.getRole() != User.Role.ADMIN) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("❌ Only administrators can set account limits");
+        }
+
         TransactionService.TransferResult result = transactionService.updateAccountLimits(iban, absoluteLimit, dailyLimit, currentUser);
 
         if (result.isSuccess()) {

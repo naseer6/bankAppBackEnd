@@ -39,14 +39,15 @@ public class BankAccountStepDefs {
             user = userService.getUserByUsername(testUsername).orElseThrow();
         }
 
-        // Always delete any existing account with this IBAN before creating a new one
-        bankAccountRepository.findByIban(iban).ifPresent(bankAccountRepository::delete);
-
-        BankAccount account = new BankAccount();
-        account.setIban(iban);
-        account.setOwner(user);
+        // If account exists, update it; otherwise, create new
+        BankAccount account = bankAccountRepository.findByIban(iban).orElse(null);
+        if (account == null) {
+            account = new BankAccount();
+            account.setIban(iban);
+            account.setOwner(user);
+            account.setType(BankAccount.AccountType.CHECKING);
+        }
         account.setBalance(balance);
-        account.setType(BankAccount.AccountType.CHECKING);
         account.setAbsoluteLimit(0.0);
         account.setDailyLimit(1000.0);
         account.setActive(true);
