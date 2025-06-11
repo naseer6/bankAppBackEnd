@@ -73,10 +73,10 @@ public class AdminController {
      * Get all bank accounts in the system
      * @return List of bank account DTOs
      */
-    @GetMapping("/accounts")
-    public ResponseEntity<List<BankAccountDTO>> getAllAccounts() {
-        List<BankAccountDTO> accountDTOs = bankAccountService.getAllAccountDTOs();
-        return ResponseEntity.ok(accountDTOs);
+    @GetMapping("/accounts")  // Maps HTTP GET requests to /accounts URL to this method
+    public ResponseEntity<List<BankAccountDTO>> getAllAccounts() {  // Method that returns a list of account DTOs wrapped in ResponseEntity
+        List<BankAccountDTO> accountDTOs = bankAccountService.getAllAccountDTOs();  // Call service layer to get all accounts as DTOs
+        return ResponseEntity.ok(accountDTOs);  // Return HTTP 200 OK status with the list of accounts in the response body
     }
 
     /**
@@ -84,11 +84,11 @@ public class AdminController {
      * @param accountId The ID of the account to retrieve
      * @return Account details
      */
-    @GetMapping("/accounts/{accountId}")
-    public ResponseEntity<BankAccountDTO> getAccountDetails(@PathVariable Long accountId) {
-        BankAccountDTO accountDTO = bankAccountService.getAccountDTOById(accountId)
-                .orElseThrow(() -> new ResourceNotFoundException("Account not found with ID: " + accountId));
-        return ResponseEntity.ok(accountDTO);
+    @GetMapping("/accounts/{accountId}")  // Maps GET requests to /accounts/[some-number] - {accountId} captures the number from URL
+    public ResponseEntity<BankAccountDTO> getAccountDetails(@PathVariable Long accountId) {  // @PathVariable extracts accountId from URL path
+        BankAccountDTO accountDTO = bankAccountService.getAccountDTOById(accountId)  // Call service to find account by ID (returns Optional)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found with ID: " + accountId));  // If Optional is empty, throw custom exception
+        return ResponseEntity.ok(accountDTO);  // Return HTTP 200 OK status with the found account in response body
     }
 
     /**
@@ -96,15 +96,15 @@ public class AdminController {
      * @param accountId The ID of the account
      * @return List of transaction DTOs
      */
-    @GetMapping("/accounts/{accountId}/transactions")
-    public ResponseEntity<List<TransactionDTO>> getAccountTransactions(@PathVariable Long accountId) {
+    @GetMapping("/accounts/{accountId}/transactions")  // Maps GET requests to /accounts/[number]/transactions URL pattern
+    public ResponseEntity<List<TransactionDTO>> getAccountTransactions(@PathVariable Long accountId) {  // Extract accountId from URL path
         // Verify account exists
-        if (!bankAccountService.accountExists(accountId)) {
-            throw new ResourceNotFoundException("Account not found with ID: " + accountId);
+        if (!bankAccountService.accountExists(accountId)) {  // Call service method to check if account exists in database
+            throw new ResourceNotFoundException("Account not found with ID: " + accountId);  // If account doesn't exist, throw exception
         }
 
-        List<TransactionDTO> transactionDTOs = transactionService.getTransactionDTOsByAccountId(accountId);
-        return ResponseEntity.ok(transactionDTOs);
+        List<TransactionDTO> transactionDTOs = transactionService.getTransactionDTOsByAccountId(accountId);  // Call transaction service to get all transactions for this account
+        return ResponseEntity.ok(transactionDTOs);  // Return HTTP 200 OK with list of transactions in response body
     }
 
     /**
@@ -112,15 +112,15 @@ public class AdminController {
      * @param accountId The ID of the account to close
      * @return Success or failure message
      */
-    @PostMapping("/accounts/{accountId}/close")
-    public ResponseEntity<String> closeAccount(@PathVariable Long accountId) {
-        try {
-            bankAccountService.closeAccount(accountId);
-            return ResponseEntity.ok("Account closed successfully.");
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    @PostMapping("/accounts/{accountId}/close")  // Maps HTTP POST requests to /accounts/[number]/close - POST used for actions that change data
+    public ResponseEntity<String> closeAccount(@PathVariable Long accountId) {  // Method returns String message wrapped in ResponseEntity
+        try {  // Start try block to handle potential exceptions
+            bankAccountService.closeAccount(accountId);  // Call service method to close the account (may throw exceptions)
+            return ResponseEntity.ok("Account closed successfully.");  // If no exception thrown, return HTTP 200 OK with success message
+        } catch (ResourceNotFoundException e) {  // Catch exception if account doesn't exist
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());  // Return HTTP 404 Not Found with error message
+        } catch (IllegalStateException e) {  // Catch exception if account can't be closed (e.g., has remaining balance)
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());  // Return HTTP 400 Bad Request with error message
         }
     }
 
@@ -128,10 +128,10 @@ public class AdminController {
      * Get statistics for the admin dashboard
      * @return Dashboard statistics
      */
-    @GetMapping("/dashboard-stats")
-    public ResponseEntity<DashboardStatsDTO> getDashboardStats() {
-        DashboardStatsDTO stats = bankAccountService.getDashboardStats();
-        return ResponseEntity.ok(stats);
+    @GetMapping("/dashboard-stats")  // Maps HTTP GET requests to /dashboard-stats URL to this method
+    public ResponseEntity<DashboardStatsDTO> getDashboardStats() {  // Method returns dashboard statistics wrapped in ResponseEntity
+        DashboardStatsDTO stats = bankAccountService.getDashboardStats();  // Call service to calculate and return dashboard statistics
+        return ResponseEntity.ok(stats);  // Return HTTP 200 OK status with statistics object in response body
     }
 
 
