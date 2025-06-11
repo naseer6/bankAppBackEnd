@@ -190,12 +190,12 @@ public class BankAccountController {
 
     @GetMapping("/balance")
     public ResponseEntity<?> getBalances(@RequestParam Long userId) {
-        Optional<User> userOpt = userRepository.findById(userId);
+        Optional<User> userOpt = userService.findById(userId);
         if (userOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ User not found");
         }
 
-        List<BankAccount> accounts = bankAccountRepository.findAllByOwner(userOpt.get());
+        List<BankAccount> accounts = bankAccountService.getAccountsByOwner(userOpt.get());
         Map<String, Double> balances = accounts.stream()
                 .collect(Collectors.toMap(
                         acc -> acc.getType().name().toLowerCase(),

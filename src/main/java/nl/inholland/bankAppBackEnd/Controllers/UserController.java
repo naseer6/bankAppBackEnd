@@ -36,9 +36,10 @@ public class UserController {
         if (userService.usernameExists(user.getUsername())) {
             return ResponseEntity.status(409).body("❌ Username is already in use");
         }
-        if (userRepository.findByBsnNumber(user.getBsnNumber()).isPresent()) {
+        if (userService.bsnNumberExists(user.getBsnNumber())) {
             return ResponseEntity.status(409).body("❌ BSN number is already in use");
         }
+
         try {
             user.setApproved(false); // All users start unapproved
             User saved = userService.register(user);

@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -65,4 +66,25 @@ public class UserService implements UserDetailsService {
     public void deleteUserByUsername(String username) {
         userRepository.findByUsername(username).ifPresent(userRepository::delete);
     }
+
+    public Optional<User> findById(Long id) {
+        return userRepository.findById(id);
+    }
+
+    public List<User> findUnapprovedUsers() {
+        return userRepository.findAll().stream()
+                .filter(user -> !user.isApproved() && user.getRole() == User.Role.USER)
+                .toList();
+    }
+
+    public void approveUser(User user) {
+        user.setApproved(true);
+        userRepository.save(user);
+    }
+
+    public boolean bsnNumberExists(String bsnNumber) {
+        return userRepository.findByBsnNumber(bsnNumber).isPresent();
+    }
+
+
 }

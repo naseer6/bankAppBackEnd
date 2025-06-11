@@ -135,6 +135,9 @@ public class BankAccountService {
         return limits;
     }
 
+    public List<BankAccount> getAccountsByOwner(User user) {
+        return bankAccountRepository.findAllByOwner(user);
+    }
 
 
 
