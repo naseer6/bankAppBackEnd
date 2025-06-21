@@ -35,9 +35,16 @@ public class User {
     @Column(name = "bsn_number", nullable = false, unique = true)
     private String bsnNumber;
 
+    /**
+     * Enum representing user roles in the system.
+     * CUSTOMER: Regular bank customer
+     * EMPLOYEE: Bank employee with approval and management rights
+     * ADMIN: System administrator (optional)
+     */
     public enum Role {
-        ADMIN,
-        USER,
+        CUSTOMER,
+        EMPLOYEE,
+        ADMIN
     }
 
     public String getBsnNumber() {

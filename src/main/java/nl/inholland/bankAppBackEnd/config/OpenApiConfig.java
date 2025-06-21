@@ -9,6 +9,11 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Swagger/OpenAPI configuration for API documentation and Swagger UI.
+ * Provides a neat, consistent, and well-documented API explorer for consumers.
+ * Includes security schemes for JWT authentication.
+ */
 @Configuration
 public class OpenApiConfig {
 
@@ -26,7 +31,7 @@ public class OpenApiConfig {
                                         .bearerFormat("JWT")))
                 .info(new Info()
                         .title("Bank Application API")
-                        .description("API documentation for Sigma Banking Application")
+                        .description("Comprehensive API documentation for the Sigma Banking Application. All endpoints are documented and conform to REST standards.")
                         .version("1.0.0")
                         .contact(new Contact()
                                 .name("Sigma Banking App")

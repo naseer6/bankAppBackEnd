@@ -6,10 +6,12 @@ import nl.inholland.bankAppBackEnd.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -29,7 +31,7 @@ public class UserController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
-        if (userService.emailExists(user.getEmail())) {
+        if (userService.existsByEmail(user.getEmail())) {
             return ResponseEntity.status(409).body("❌ Email is already in use");
         }
 
@@ -57,24 +59,29 @@ public class UserController {
         String email = creds.get("email");
         String password = creds.get("password");
 
-        Optional<User> optionalUser = userService.getUserByEmail(email); // ✅ changed from getUserByUsername
+        Optional<User> optionalUser = userService.getUserByEmail(email);
 
         if (optionalUser.isEmpty() || !passwordEncoder.matches(password, optionalUser.get().getPassword())) {
             return ResponseEntity.status(401).body("Invalid credentials");
         }
 
         User user = optionalUser.get();
-        String token = jwtUtil.generateToken(user.getUsername(), user.getRole().toString()); // still generating based on username
 
-        return ResponseEntity.ok(Map.of(
-                "token", token,
-                "username", user.getUsername(),
-                "role", user.getRole(),
-                "approved", user.isApproved(),
-                "message", user.isApproved()
-                        ? "Login successful"
-                        : "Login successful, but your account is not yet approved"
-        ));
+        // Load UserDetails for JWT generation
+        UserDetails userDetails = userService.loadUserByUsername(user.getUsername());
+        String token = jwtUtil.generateToken(userDetails);
+
+        // Use HashMap instead of Map.of() for more reliable handling
+        Map<String, Object> responseMap = new HashMap<>();
+        responseMap.put("token", token);
+        responseMap.put("username", user.getUsername());
+        responseMap.put("role", user.getRole().toString());
+        responseMap.put("approved", user.isApproved());
+        responseMap.put("message", user.isApproved()
+                ? "Login successful"
+                : "Login successful, but your account is not yet approved");
+
+        return ResponseEntity.ok(responseMap);
     }
 
 
@@ -117,18 +124,22 @@ public class UserController {
             return ResponseEntity.status(401).body("Invalid credentials");
         }
 
-        String token = jwtUtil.generateToken(user.getUsername(), user.getRole().toString());
+        // Load UserDetails for JWT generation
+        UserDetails userDetails = userService.loadUserByUsername(user.getUsername());
+        String token = jwtUtil.generateToken(userDetails);
         System.out.println("🎟️ Generated JWT: " + token);
 
-        return ResponseEntity.ok(Map.of(
-                "token", token,
-                "username", user.getUsername(),
-                "role", user.getRole(),
-                "approved", user.isApproved(),
-                "message", user.isApproved()
-                        ? "Login successful"
-                        : "Login successful, but your account is not yet approved"
-        ));
+        // Use HashMap instead of Map.of() for more reliable handling
+        Map<String, Object> responseMap = new HashMap<>();
+        responseMap.put("token", token);
+        responseMap.put("username", user.getUsername());
+        responseMap.put("role", user.getRole().toString());
+        responseMap.put("approved", user.isApproved());
+        responseMap.put("message", user.isApproved()
+                ? "Login successful"
+                : "Login successful, but your account is not yet approved");
+
+        return ResponseEntity.ok(responseMap);
     }
 
 

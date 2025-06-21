@@ -71,7 +71,7 @@ public class BankAccountController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("❌ Account creation is only allowed for approved users");
         }
 
-        if (!user.getRole().equals(User.Role.USER)) {
+        if (!user.getRole().equals(User.Role.CUSTOMER)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("❌ Account can only be created for users with USER role");
         }
 
@@ -285,7 +285,7 @@ public class BankAccountController {
         BankAccount account = accountOpt.get();
 
         // Users can only view their own account limits, admins can view any
-        if (currentUser.getRole() == User.Role.USER && !account.getOwner().getId().equals(currentUser.getId())) {
+        if (currentUser.getRole() == User.Role.CUSTOMER && !account.getOwner().getId().equals(currentUser.getId())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("❌ You can only view your own account limits");
         }
 

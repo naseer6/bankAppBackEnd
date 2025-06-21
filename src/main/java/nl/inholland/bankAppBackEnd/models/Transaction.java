@@ -14,6 +14,9 @@ public class Transaction {
     @Column(name = "transaction_type", nullable = false, length = 20)
     private String transactionType;
 
+    @Column(name = "currency", nullable = false, length = 3)
+    private String currency = "EUR"; // Default currency
+
     @ManyToOne
     @JoinColumn(name = "from_account_id")
     private BankAccount fromAccount;
@@ -52,6 +55,14 @@ public class Transaction {
 
     public void setTransactionType(String transactionType) {
         this.transactionType = transactionType;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
 
     public BankAccount getFromAccount() {

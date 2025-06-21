@@ -6,6 +6,7 @@ import nl.inholland.bankAppBackEnd.models.Transaction;
 import nl.inholland.bankAppBackEnd.models.User;
 import nl.inholland.bankAppBackEnd.repository.BankAccountRepository;
 import nl.inholland.bankAppBackEnd.repository.TransactionRepository;
+import nl.inholland.bankAppBackEnd.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -25,16 +26,83 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final BankAccountRepository bankAccountRepository;
+    private final UserRepository userRepository;
 
     @Autowired
     public TransactionService(TransactionRepository transactionRepository,
-                              BankAccountRepository bankAccountRepository) {
+                              BankAccountRepository bankAccountRepository,
+                              UserRepository userRepository) {
         this.transactionRepository = transactionRepository;
         this.bankAccountRepository = bankAccountRepository;
+        this.userRepository = userRepository;
     }
 
     // Basic CRUD operations
-    public Transaction save(Transaction transaction) {
+    public Transaction saveTransaction(Transaction transaction) {
+        return transactionRepository.save(transaction);
+    }
+
+    /**
+     * Creates a deposit transaction via ATM
+     * @param account The account to deposit into
+     * @param amount The amount to deposit
+     * @param initiatedBy User who initiated the transaction
+     * @param description Optional description
+     * @return The saved transaction
+     */
+    @Transactional
+    public Transaction createAtmDeposit(BankAccount account, Double amount, User initiatedBy, String description) {
+        // Update account balance
+        account.setBalance(account.getBalance() + amount);
+        bankAccountRepository.save(account);
+
+        // Create transaction record
+        Transaction transaction = new Transaction();
+        transaction.setAmount(amount);
+        transaction.setTimestamp(LocalDateTime.now());
+        transaction.setTransactionType(description != null ? description : "ATM Deposit");
+        transaction.setToAccount(account);
+        transaction.setInitiatedByUser(initiatedBy);
+        transaction.setCurrency("EUR");
+
+        return transactionRepository.save(transaction);
+    }
+
+    /**
+     * Creates a withdrawal transaction via ATM
+     * @param account The account to withdraw from
+     * @param amount The amount to withdraw
+     * @param initiatedBy User who initiated the transaction
+     * @param description Optional description
+     * @return The saved transaction
+     */
+    @Transactional
+    public Transaction createAtmWithdrawal(BankAccount account, Double amount, User initiatedBy, String description) {
+        // Check limits and update account
+        account.resetDailySpentIfNewDay();
+
+        if (account.wouldViolateAbsoluteLimit(amount)) {
+            throw new IllegalArgumentException("Withdrawal would exceed absolute limit");
+        }
+
+        if (account.wouldExceedDailyLimit(amount)) {
+            throw new IllegalArgumentException("Withdrawal would exceed daily limit");
+        }
+
+        // Update account balance
+        account.setBalance(account.getBalance() - amount);
+        account.addToDailySpent(amount);
+        bankAccountRepository.save(account);
+
+        // Create transaction record
+        Transaction transaction = new Transaction();
+        transaction.setAmount(amount);
+        transaction.setTimestamp(LocalDateTime.now());
+        transaction.setTransactionType(description != null ? description : "ATM Withdrawal");
+        transaction.setFromAccount(account);
+        transaction.setInitiatedByUser(initiatedBy);
+        transaction.setCurrency("EUR");
+
         return transactionRepository.save(transaction);
     }
 
@@ -320,21 +388,175 @@ public class TransactionService {
         return transactionRepository.findByAccountOwner(user, pageable);
     }
 
-    // Get transactions for a user
-    public List<Transaction> getTransactionsByUser(User user) {
-        return transactionRepository.findByAccountOwner(user);
-    }
-
-    // Get transactions for a specific bank account
-    public List<Transaction> getTransactionsByAccountId(Long accountId) {
-        return transactionRepository.findByFromAccountIdOrToAccountIdOrderByTimestampDesc(accountId, accountId);
-    }
-
-    // Count transactions for today
+    /**
+     * Gets the count of transactions made today.
+     * @return Count of today's transactions
+     */
     public int getTodayTransactionsCount() {
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
-        return (int) transactionRepository.countTransactionsByDate(startOfDay, endOfDay);
+        LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
+        LocalDateTime endOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
+        return (int) transactionRepository.findAll().stream()
+                .filter(tx -> tx.getTimestamp().isAfter(startOfDay) && tx.getTimestamp().isBefore(endOfDay))
+                .count();
+    }
+
+    /**
+     * Gets all transactions for a specific user across all their accounts.
+     * @param user User to get transactions for
+     * @return List of transactions
+     */
+    public List<Transaction> getTransactionsByUser(User user) {
+        List<BankAccount> userAccounts = bankAccountRepository.findAllByOwner(user);
+        List<String> userIbans = userAccounts.stream()
+                .map(BankAccount::getIban)
+                .collect(Collectors.toList());
+
+        return transactionRepository.findAll().stream()
+                .filter(tx -> (tx.getFromAccount() != null && userIbans.contains(tx.getFromAccount().getIban()))
+                           || (tx.getToAccount() != null && userIbans.contains(tx.getToAccount().getIban())))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Creates a transaction from a DTO and processes the fund transfer.
+     * @param transactionDTO Transaction details
+     * @return Created transaction
+     */
+    @Transactional
+    public Transaction createTransaction(TransactionDTO transactionDTO) {
+        BankAccount fromAccount = bankAccountRepository.findByIban(transactionDTO.getFromIban())
+                .orElseThrow(() -> new IllegalArgumentException("Source account not found"));
+
+        BankAccount toAccount = bankAccountRepository.findByIban(transactionDTO.getToIban())
+                .orElseThrow(() -> new IllegalArgumentException("Destination account not found"));
+
+        // Validate transaction
+        validateTransaction(fromAccount, toAccount, transactionDTO.getAmount());
+
+        // Process the transfer
+        fromAccount.setBalance(fromAccount.getBalance() - transactionDTO.getAmount());
+        toAccount.setBalance(toAccount.getBalance() + transactionDTO.getAmount());
+        fromAccount.addToDailySpent(transactionDTO.getAmount());
+
+        bankAccountRepository.save(fromAccount);
+        bankAccountRepository.save(toAccount);
+
+        // Create and save transaction record
+        Transaction transaction = new Transaction();
+        transaction.setFromAccount(fromAccount);
+        transaction.setToAccount(toAccount);
+        transaction.setAmount(transactionDTO.getAmount());
+        transaction.setTimestamp(LocalDateTime.now());
+        transaction.setTransactionType(transactionDTO.getDescription()); // Use setTransactionType instead of setDescription
+        transaction.setInitiatedByUser(userRepository.findByUsername(transactionDTO.getInitiatedBy())
+                .orElse(null)); // Use initiatedBy instead of performedBy
+
+        return transactionRepository.save(transaction);
+    }
+
+    /**
+     * Validates a transaction against business rules and limits.
+     * @param fromAccount Source account
+     * @param toAccount Destination account
+     * @param amount Transaction amount
+     * @throws IllegalStateException if validation fails
+     */
+    private void validateTransaction(BankAccount fromAccount, BankAccount toAccount, Double amount) {
+        // Check for non-positive amount
+        if (amount <= 0) {
+            throw new IllegalArgumentException("Transaction amount must be positive");
+        }
+
+        // Reset daily spent if it's a new day
+        fromAccount.resetDailySpentIfNewDay();
+
+        // Check for absolute limit violation
+        if (fromAccount.wouldViolateAbsoluteLimit(amount)) {
+            throw new IllegalStateException("Transaction would violate absolute limit");
+        }
+
+        // Check for daily limit violation
+        if (fromAccount.wouldExceedDailyLimit(amount)) {
+            throw new IllegalStateException("Transaction would exceed daily limit");
+        }
+    }
+
+    /**
+     * Saves a transaction to the repository.
+     * @param transaction Transaction to save
+     * @return Saved transaction
+     */
+    public Transaction save(Transaction transaction) {
+        return transactionRepository.save(transaction);
+    }
+
+    /**
+     * Gets all transactions in the system.
+     * @return List of all transactions
+     */
+    public List<Transaction> getAllTransactions() {
+        return transactionRepository.findAll();
+    }
+
+    /**
+     * Filters transactions by various criteria.
+     * @param user User to filter transactions for (can be null for employees)
+     * @param startDate Start date for filtering (can be null)
+     * @param endDate End date for filtering (can be null)
+     * @param minAmount Minimum amount for filtering (can be null)
+     * @param maxAmount Maximum amount for filtering (can be null)
+     * @param iban IBAN to filter by (can be null)
+     * @return Filtered list of transactions
+     */
+    public List<Transaction> filterTransactions(User user, LocalDate startDate, LocalDate endDate,
+                                                Double minAmount, Double maxAmount, String iban) {
+
+        List<Transaction> transactions;
+
+        // If user is provided, get only their transactions, otherwise get all (for employees)
+        if (user != null) {
+            transactions = getTransactionsByUser(user);
+        } else {
+            transactions = getAllTransactions();
+        }
+
+        // Filter by date range if provided
+        if (startDate != null) {
+            LocalDateTime startDateTime = startDate.atStartOfDay();
+            transactions = transactions.stream()
+                    .filter(tx -> tx.getTimestamp().isAfter(startDateTime) || tx.getTimestamp().isEqual(startDateTime))
+                    .collect(Collectors.toList());
+        }
+
+        if (endDate != null) {
+            LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+            transactions = transactions.stream()
+                    .filter(tx -> tx.getTimestamp().isBefore(endDateTime) || tx.getTimestamp().isEqual(endDateTime))
+                    .collect(Collectors.toList());
+        }
+
+        // Filter by amount range if provided
+        if (minAmount != null) {
+            transactions = transactions.stream()
+                    .filter(tx -> tx.getAmount() >= minAmount)
+                    .collect(Collectors.toList());
+        }
+
+        if (maxAmount != null) {
+            transactions = transactions.stream()
+                    .filter(tx -> tx.getAmount() <= maxAmount)
+                    .collect(Collectors.toList());
+        }
+
+        // Filter by IBAN if provided
+        if (iban != null && !iban.isEmpty()) {
+            transactions = transactions.stream()
+                    .filter(tx -> (tx.getFromAccount() != null && tx.getFromAccount().getIban().equals(iban)) ||
+                                 (tx.getToAccount() != null && tx.getToAccount().getIban().equals(iban)))
+                    .collect(Collectors.toList());
+        }
+
+        return transactions;
     }
 
     public static class TransferResult {
@@ -369,7 +591,7 @@ public class TransactionService {
         }
 
         // Regular users can only access their own accounts
-        if (user.getRole() == User.Role.USER && !account.getOwner().getId().equals(user.getId())) {
+        if (user.getRole() == User.Role.CUSTOMER && !account.getOwner().getId().equals(user.getId())) {
             return new TransferResult(false, "❌ You can only " + action + " your own accounts");
         }
 
@@ -419,7 +641,7 @@ public class TransactionService {
         }
 
         // For customer transfers, verify ownership
-        if (initiatedBy.getRole() == User.Role.USER) {
+        if (initiatedBy.getRole() == User.Role.CUSTOMER) {
             TransferResult accessResult = validateAccountAccess(fromAccount, initiatedBy, "transfer from");
             if (!accessResult.isSuccess()) {
                 return accessResult;
@@ -466,7 +688,7 @@ public class TransactionService {
         }
 
         // Check daily limit (only for customer transfers, admins can override)
-        if (initiatedBy.getRole() == User.Role.USER && fromAccount.wouldExceedDailyLimit(amount)) {
+        if (initiatedBy.getRole() == User.Role.CUSTOMER && fromAccount.wouldExceedDailyLimit(amount)) {
             double remainingLimit = fromAccount.getRemainingDailyLimit();
             return new TransferResult(false,
                     String.format("❌ Transfer would exceed daily limit. Remaining daily limit: €%.2f",
@@ -495,7 +717,7 @@ public class TransactionService {
         BankAccount account = accountOpt.get();
 
         // For customer deposits, verify ownership
-        if (initiatedBy.getRole() == User.Role.USER) {
+        if (initiatedBy.getRole() == User.Role.CUSTOMER) {
             TransferResult accessResult = validateAccountAccess(account, initiatedBy, "deposit to");
             if (!accessResult.isSuccess()) {
                 return accessResult;
@@ -527,7 +749,7 @@ public class TransactionService {
         BankAccount account = accountOpt.get();
 
         // For customer withdrawals, verify ownership
-        if (initiatedBy.getRole() == User.Role.USER) {
+        if (initiatedBy.getRole() == User.Role.CUSTOMER) {
             TransferResult accessResult = validateAccountAccess(account, initiatedBy, "withdraw from");
             if (!accessResult.isSuccess()) {
                 return accessResult;
@@ -876,4 +1098,20 @@ public class TransactionService {
                 .map(this::convertToAdminDTO)
                 .collect(Collectors.toList());
     }
+
+    /**
+     * Get all transactions related to a specific bank account by ID
+     * @param accountId The ID of the bank account
+     * @return List of transactions associated with the account
+     */
+    public List<Transaction> getTransactionsByAccountId(Long accountId) {
+        BankAccount account = bankAccountRepository.findById(accountId)
+                .orElseThrow(() -> new IllegalArgumentException("Account not found with ID: " + accountId));
+
+        return transactionRepository.findAll().stream()
+                .filter(tx -> (tx.getFromAccount() != null && tx.getFromAccount().getId().equals(accountId)) ||
+                             (tx.getToAccount() != null && tx.getToAccount().getId().equals(accountId)))
+                .collect(Collectors.toList());
+    }
 }
+
